@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Usuarios y Autenticación
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String   // Hashed
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 2. Configuración del Sistema (Singleton row usually)
+model SystemConfig {
+  id                Int     @id @default(1)
+  ivaPercentage     Decimal @default(21.0)
+  extraTaxPercentage Decimal @default(3.0)
+  expiryAlertMonths Int     @default(3)
+  filterMinYear     Int     @default(2020)
+  filterMaxYear     Int     @default(2050)
+  
+  updatedAt         DateTime @updatedAt
+}
+
+// 3. Catálogo de Productos (Concepto)
+model ProductCatalog {
+  code        String   @id // Código único del producto (ej: "OLEO31")
+  description String
+  listPrice   Decimal  // Precio de lista oficial
+  offerPrice  Decimal  @default(0) // Precio de Oferta
+  imageUrl    String?
+
+  stockBatches StockBatch[]
+  saleItems    SaleItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 4. Lotes de Stock (Ingresos)
+model StockBatch {
+  id                 String   @id @default(cuid())
+  productCode        String
+  product            ProductCatalog @relation(fields: [productCode], references: [code], onUpdate: Cascade)
+  
+  initialQuantity    Int      // Cantidad original comprada
+  currentQuantity    Int      // Cantidad actual disponible
+  
+  costGross          Decimal  // Costo bruto unitario
+  taxRate            Decimal  // % IVA al momento de compra
+  extraTaxRate       Decimal  // % Impuesto extra al momento de compra
+  
+  // Costos prorrateados
+  shippingCostUnit      Decimal @default(0) // Costo envío unitario
+  incentiveDiscountUnit Decimal @default(0) // Descuento incentivo unitario (valor negativo generalmente o positivo a restar)
+  offerPrice         Decimal @default(0)
+  
+  expirationDate     DateTime // Fecha Vencimiento
+  entryDate          DateTime @default(now()) // Fecha Ingreso
+
+  // Relación con ventas para trazabilidad
+  saleAllocations    SaleItemBatchAllocation[]
+
+  @@index([productCode, expirationDate]) // Para optimizar búsqueda FIFO
+}
+
+// 5. Ventas
+model Sale {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  clientName  String
+  clientPhone String?
+  
+  totalAmount Decimal
+  isGift      Boolean  @default(false)
+  notes       String?
+
+  items       SaleItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 6. Detalle de Venta
+model SaleItem {
+  id          String   @id @default(cuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  
+  productCode String
+  product     ProductCatalog @relation(fields: [productCode], references: [code], onUpdate: Cascade)
+  
+  quantity    Int
+  unitPriceSold Decimal // Precio al que se vendió
+  
+  // Snapshot de costos para reportes históricos de ganancia
+  totalCostBasis Decimal // Costo total de estos items calculado desde los lotes
+  
+  // Trazabilidad de qué lotes se usaron
+  allocations SaleItemBatchAllocation[]
+}
+
+// 7. Relación Muchos-a-Muchos explícita para saber qué lotes abastecieron qué venta
+model SaleItemBatchAllocation {
+  id           String     @id @default(cuid())
+  saleItemId   String
+  saleItem     SaleItem   @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  
+  stockBatchId String
+  stockBatch   StockBatch @relation(fields: [stockBatchId], references: [id])
+  
+  quantity     Int        // Cantidad tomada de este lote
+  unitCostAtTime Decimal  // Costo unitario real de este lote en ese momento (redundancia performante)
+}
+
+// 8. Gastos Operativos (Ayuda de Venta)
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  description String
+  amount      Decimal
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
