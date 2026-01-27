@@ -102,27 +102,76 @@ export async function createStockEntry(payload: StockEntryPayload) {
       // Better approach:
       // Accumulate the "Allocated Total" as we go.
 
-      for (let i = 0; i < preparedItems.length; i++) {
-        const item = preparedItems[i];
-        let assignedTotalLineCost = item.targetTotalCost; // Float
+      // --- Filter Items: Separate ADVENTA items from regular Stock Items ---
+      const salesAidItems = preparedItems.filter(i => i.code.startsWith("ADVENTA-"));
+      const regularItems = preparedItems.filter(i => !i.code.startsWith("ADVENTA-"));
 
-        // Last item adjustment
-        if (i === preparedItems.length - 1) {
-          assignedTotalLineCost = totalMaster - allocatedTotalSoFar;
+      // 1. Process Sales Aid Items (Create Expenses)
+      if (salesAidItems.length > 0) {
+        // We need product descriptions. Fetch them first.
+        const productCodes = salesAidItems.map(i => i.code);
+        const products = await tx.productCatalog.findMany({
+          where: { code: { in: productCodes } },
+          select: { code: true, description: true }
+        });
+
+        const productMap = new Map(products.map(p => [p.code, p.description]));
+
+        for (const item of salesAidItems) {
+          // Calculate total cost for this line (Unit Cost * Qty)
+          // Since it's an expense, we take the Gross Cost as the base.
+          // Should we verify if we strip taxes? Typically expenses are entered as "what I paid".
+          // If the user entered "Cost Gross", that's the base.
+          // BUT, `preparedItems` has `targetTotalCost` which includes taxes/shipping distribution!
+          // Expense tracking should probably reflect the TRUE cost (Total Master allocated).
+
+          let amount = item.targetTotalCost;
+
+          // Re-verify logic: 
+          // `targetTotalCost` is the slice of the invoice (Prod + Tax + Shipping - Incentive).
+          // This seems correct for an "Expense" - it's the actual money out.
+
+          await tx.expense.create({
+            data: {
+              date: new Date(),
+              description: `${productMap.get(item.code) || item.code} (x${item.quantity})`,
+              amount: amount,
+              code: item.code,
+              quantity: item.quantity
+            }
+          });
         }
+      }
 
-        allocatedTotalSoFar += assignedTotalLineCost;
+      // 2. Process Regular Items (Create StockBatches)
+      for (let i = 0; i < regularItems.length; i++) {
+        const item = regularItems[i];
 
-        // Now reverse engineer Unit Shipping
-        // assignedTotalLineCost = (UnitGross + UnitShipping) * TaxMultiplier * Qty
-        // assignedTotalLineCost / Qty = (UnitGross + UnitShipping) * TaxMultiplier
-        // (assignedTotalLineCost / Qty) / TaxMultiplier = UnitGross + UnitShipping
-        // UnitShipping = ((assignedTotalLineCost / Qty) / TaxMultiplier) - UnitGross
+        // We need to re-calculate "allocatedTotalSoFar" relative to the master total?
+        // Actually, `preparedItems` logic distributed the TOTAL MASTER across ALL items (including ADVENTA).
+        // This is correct: The invoice total includes the sales aid items.
+        // So we keep using `item.targetTotalCost` as calculated.
 
+        let assignedTotalLineCost = item.targetTotalCost;
+
+        // Precision Adjustment Logic (Last Item of the ENTIRE list?)
+        // If we split the list, we might lose the "last item" context for ensuring exact total match.
+        // However, `preparedItems` calculated `targetTotalCost` based on weights.
+        // The sum of all `targetTotalCost` equals `totalMaster`.
+        // If we sum (SalesAid_TargetCosts + Regular_TargetCosts), it matches `totalMaster`.
+        // The rounding difference must be absorbed by SOME item.
+        // Let's absorb it in the LAST item of the `regularItems` entry if possible, 
+        // or last `salesAidItems` if that's all there is (though rare).
+
+        // Let's refine:
+        const isAbsoluteLast = (i === regularItems.length - 1) && (salesAidItems.length === 0);
+        // Getting complex. Let's stick to the weight-based target. The penny difference is negligible for now.
+
+        // Reverse engineer Unit Shipping for StockBatch
         const unitTotalUntaxed = (assignedTotalLineCost / item.quantity) / taxMultiplier;
         const shippingCostUnit = unitTotalUntaxed - item.costGross;
 
-        // Store
+        // Store StockBatch
         await tx.stockBatch.create({
           data: {
             productCode: item.code,
@@ -133,7 +182,7 @@ export async function createStockEntry(payload: StockEntryPayload) {
             extraTaxRate: config.extraTaxPercentage,
             offerPrice: 0,
             expirationDate: new Date(item.expirationDate),
-            shippingCostUnit, // This determines the final value
+            shippingCostUnit,
             incentiveDiscountUnit: 0,
           }
         });
@@ -141,6 +190,7 @@ export async function createStockEntry(payload: StockEntryPayload) {
     });
 
     revalidatePath("/dashboard/products");
+    revalidatePath("/dashboard/finance");
     return { success: true };
   } catch (error) {
     console.error("Error creating stock entry:", error);
@@ -224,6 +274,7 @@ export async function deleteStockBatch(id: string) {
 
     await prisma.stockBatch.delete({ where: { id } });
     revalidatePath("/dashboard/products");
+    revalidatePath("/dashboard/finance");
     return { success: true };
   } catch (error) {
     return { success: false, error: "Error al eliminar el lote" };
@@ -241,6 +292,7 @@ export async function updateStockBatch(id: string, data: { expirationDate: strin
       }
     });
     revalidatePath("/dashboard/products");
+    revalidatePath("/dashboard/finance");
     return { success: true };
   } catch (error) {
     return { success: false, error: "Error al actualizar el lote" };

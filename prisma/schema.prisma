@@ -81,6 +81,7 @@ model Sale {
   
   totalAmount Decimal
   isGift      Boolean  @default(false)
+  isLost      Boolean  @default(false) // Pérdida/Rotura/Robo
   notes       String?
 
   items       SaleItem[]
@@ -126,6 +127,8 @@ model Expense {
   id          String   @id @default(cuid())
   date        DateTime @default(now())
   description String
+  code        String?  // Código opcional (para items desviados desde stock)
+  quantity    Int      @default(1)
   amount      Decimal
   
   createdAt   DateTime @default(now())

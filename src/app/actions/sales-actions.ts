@@ -18,15 +18,17 @@ export type SalePayload = {
   date: string;
   clientName: string;
   clientPhone?: string;
+  notes?: string;
   isGift: boolean;
+  isLost?: boolean;
   items: SaleItemPayload[];
 };
 
 export async function createSale(payload: SalePayload) {
-  const { date, clientName, clientPhone, isGift, items } = payload;
+  const { date, clientName, clientPhone, notes, isGift, isLost = false, items } = payload;
 
   // Calculate total amount
-  const totalAmount = isGift ? 0 : items.reduce((acc, item) => acc + (item.unitPriceSold * item.quantity), 0);
+  const totalAmount = (isGift || isLost) ? 0 : items.reduce((acc, item) => acc + (item.unitPriceSold * item.quantity), 0);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -36,8 +38,10 @@ export async function createSale(payload: SalePayload) {
           date: new Date(date),
           clientName,
           clientPhone,
+          notes: notes || "",
           totalAmount,
           isGift,
+          isLost,
         }
       });
 
@@ -63,7 +67,7 @@ export async function createSale(payload: SalePayload) {
             saleId: sale.id,
             productCode: item.productCode,
             quantity: item.quantity,
-            unitPriceSold: isGift ? 0 : item.unitPriceSold,
+            unitPriceSold: (isGift || isLost) ? 0 : item.unitPriceSold,
             totalCostBasis: totalCostBasis,
           }
         });
@@ -95,15 +99,22 @@ export async function createSale(payload: SalePayload) {
   }
 }
 
-export async function getSales(month: number, year: number, query?: string, isGift?: boolean) {
+export async function getSales(month: number, year: number, query?: string, isGift?: boolean, isLost?: boolean) {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0, 23, 59, 59);
 
   const whereClause: any = {};
 
-  if (isGift) {
+  if (isGift && isLost) {
+    whereClause.OR = [
+      { isGift: true },
+      { isLost: true }
+    ];
+    // Date filter skipped
+  } else if (isGift) {
     whereClause.isGift = true;
-    // Date filter skipped to show all gifts history
+  } else if (isLost) {
+    whereClause.isLost = true;
   } else {
     // Normal behavior: Filter by Month/Year
     whereClause.date = {
@@ -173,6 +184,9 @@ export async function getAvailableStock(productCode: string) {
 export async function getProductsWithStock() {
   const stock = await prisma.stockBatch.groupBy({
     by: ['productCode'],
+    where: { // Add extra ADVENTA safety filter even though they shouldn't have stock
+      productCode: { not: { startsWith: "ADVENTA-" } }
+    },
     _sum: { currentQuantity: true },
     having: {
       currentQuantity: { _sum: { gt: 0 } }
@@ -275,11 +289,13 @@ export async function deleteSale(saleId: string) {
 }
 
 export async function updateSale(saleId: string, payload: SalePayload) {
-  const { date, clientName, clientPhone, isGift, items } = payload;
-  const totalAmount = isGift ? 0 : items.reduce((acc, item) => acc + (item.unitPriceSold * item.quantity), 0);
+  const { date, clientName, clientPhone, notes, isGift, isLost = false, items } = payload;
+  const totalAmount = (isGift || isLost) ? 0 : items.reduce((acc, item) => acc + (item.unitPriceSold * item.quantity), 0);
 
   try {
     await prisma.$transaction(async (tx) => {
+      // ... (revert stock and delete items logic unchanged) ...
+
       // 1. REVERT STOCK from existing sale items
       const oldItems = await tx.saleItem.findMany({
         where: { saleId },
@@ -307,8 +323,10 @@ export async function updateSale(saleId: string, payload: SalePayload) {
           date: new Date(date),
           clientName,
           clientPhone,
+          notes: notes || "",
           totalAmount,
           isGift,
+          isLost,
         }
       });
 
@@ -330,7 +348,7 @@ export async function updateSale(saleId: string, payload: SalePayload) {
             saleId: saleId,
             productCode: item.productCode,
             quantity: item.quantity,
-            unitPriceSold: isGift ? 0 : item.unitPriceSold,
+            unitPriceSold: (isGift || isLost) ? 0 : item.unitPriceSold,
             totalCostBasis: totalCostBasis,
           }
         });

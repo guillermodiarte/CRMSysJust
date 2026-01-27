@@ -12,7 +12,7 @@ import { getSystemConfig } from "@/app/actions/config-actions";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 export default function FinancePage() {
-  const [metrics, setMetrics] = useState({ revenue: 0, expenses: 0, netProfit: 0, giftCost: 0, salesProfit: 0, salesCost: 0 });
+  const [metrics, setMetrics] = useState({ revenue: 0, expenses: 0, netProfit: 0, giftCost: 0, salesProfit: 0, salesCost: 0, expenseFromLoss: 0 });
   const [month, setMonth] = useState<string>(String(new Date().getMonth() + 1));
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState<string>(String(currentYear));
@@ -53,16 +53,17 @@ export default function FinancePage() {
     { name: "Ganancia Vtas", value: metrics.salesProfit, fill: COLORS[1] },
     { name: "Gastos Stock", value: metrics.expenses, fill: COLORS[2] },
     { name: "Regalos", value: metrics.giftCost, fill: COLORS[4] },
+    { name: "Pérdidas", value: metrics.expenseFromLoss, fill: "#ea580c" }, // Added Loss to chart (Orange)
   ];
 
   // Refined data for Pie Chart (Positive values only)
   const pieData = data.filter(d => d.value > 0);
-  // Pie Data excluding Gifts (and adjusting Stock Expenses to exclude gift costs)
+  // Pie Data excluding Gifts and Losses (and adjusting Stock Expenses)
   const pieDataNoGifts = data
-    .filter(d => d.name !== "Regalos")
+    .filter(d => d.name !== "Regalos" && d.name !== "Pérdidas")
     .map(d => {
       if (d.name === "Gastos Stock") {
-        return { ...d, value: d.value - metrics.giftCost };
+        return { ...d, value: d.value - metrics.giftCost - metrics.expenseFromLoss };
       }
       return d;
     })
@@ -131,10 +132,19 @@ export default function FinancePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Costo Regalos</CardTitle>
+            <CardTitle className="text-sm font-medium">Costo Regalos/Pérd.</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{formatCurrency(metrics.giftCost)}</div>
+            <div className="flex flex-col space-y-1">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-purple-600 font-bold">Regalos:</span>
+                <span className="font-bold">{formatCurrency(metrics.giftCost)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-orange-600 font-bold">Pérdidas:</span>
+                <span className="font-bold">{formatCurrency(metrics.expenseFromLoss)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -215,7 +225,7 @@ export default function FinancePage() {
 
         <Card className="col-span-1 lg:col-span-1">
           <CardHeader>
-            <CardTitle>Comp. % (Sin Regalos)</CardTitle>
+            <CardTitle>Comp. % (Sin Regalos/Pérd.)</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
             {metrics.revenue === 0 && metrics.expenses === 0 ? (

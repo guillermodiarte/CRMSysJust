@@ -28,7 +28,9 @@ export async function getDashboardMetrics() {
       date: {
         gte: new Date(currentYear, currentMonth - 1, 1),
         lte: new Date(currentYear, currentMonth, 0, 23, 59, 59)
-      }
+      },
+      isGift: false,
+      isLost: false
     }
   });
 

@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Briefcase, Calendar } from "lucide-react";
 import { getExpenses, createExpense, deleteExpense } from "@/app/actions/expense-actions";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { getSystemConfig } from "@/app/actions/config-actions";
 import {
   AlertDialog,
@@ -49,7 +49,8 @@ export default function SalesHelpPage() {
   const [newExpense, setNewExpense] = useState({
     description: "",
     amount: "",
-    date: format(new Date(), "yyyy-MM-dd")
+    date: format(new Date(), "yyyy-MM-dd"),
+    quantity: "1"
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -86,12 +87,13 @@ export default function SalesHelpPage() {
     const res = await createExpense({
       description: newExpense.description,
       amount: parseFloat(newExpense.amount),
-      date: new Date(newExpense.date + "T12:00:00") // Fix timezone issue simply
+      date: new Date(newExpense.date + "T12:00:00"), // Fix timezone issue simply
+      quantity: parseInt(newExpense.quantity) || 1
     });
 
     if (res.success) {
       toast.success("Gasto registrado");
-      setNewExpense({ description: "", amount: "", date: format(new Date(), "yyyy-MM-dd") });
+      setNewExpense({ description: "", amount: "", date: format(new Date(), "yyyy-MM-dd"), quantity: "1" });
       setIsNewOpen(false);
       loadData();
     } else {
@@ -133,6 +135,17 @@ export default function SalesHelpPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="quantity" className="text-right">Cantidad</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min="1"
+                  className="col-span-3"
+                  value={newExpense.quantity}
+                  onChange={(e) => setNewExpense({ ...newExpense, quantity: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date" className="text-right">Fecha</Label>
                 <Input
                   id="date"
@@ -153,7 +166,7 @@ export default function SalesHelpPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">Monto</Label>
+                <Label htmlFor="amount" className="text-right">Monto Total</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -181,7 +194,7 @@ export default function SalesHelpPage() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Total Gastos (Periodo)</p>
-            <p className="text-xl font-bold">${totalAmount.toFixed(2)}</p>
+            <p className="text-xl font-bold">{formatCurrency(totalAmount)}</p>
           </div>
         </div>
 
@@ -216,6 +229,8 @@ export default function SalesHelpPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>
+              <TableHead>Código</TableHead>
+              <TableHead className="w-[80px]">Cant.</TableHead>
               <TableHead>Descripción</TableHead>
               <TableHead className="text-right">Monto</TableHead>
               <TableHead className="w-[100px] text-right">Acciones</TableHead>
@@ -224,15 +239,17 @@ export default function SalesHelpPage() {
           <TableBody>
             {expenses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center">No hay gastos en este periodo.</TableCell>
+                <TableCell colSpan={6} className="h-24 text-center">No hay gastos en este periodo.</TableCell>
               </TableRow>
             ) : (
               expenses.map((expense) => (
                 <TableRow key={expense.id}>
                   <TableCell>{format(new Date(expense.date), "dd/MM/yyyy")}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{expense.code || "-"}</TableCell>
+                  <TableCell className="text-center">{expense.quantity}</TableCell>
                   <TableCell className="font-medium">{expense.description}</TableCell>
                   <TableCell className="text-right font-bold text-red-600">
-                    -${Number(expense.amount).toFixed(2)}
+                    -{formatCurrency(Number(expense.amount))}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setDeleteId(expense.id)}>
@@ -259,15 +276,19 @@ export default function SalesHelpPage() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <CardTitle className="text-lg font-bold">{expense.description}</CardTitle>
-                    <p className="text-xs text-muted-foreground font-mono flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      {format(new Date(expense.date), "dd/MM/yyyy")}
-                    </p>
+                    <div className="flex gap-2 text-xs text-muted-foreground font-mono">
+                      <span className="flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {format(new Date(expense.date), "dd/MM/yyyy")}
+                      </span>
+                      {expense.code && <span>| {expense.code}</span>}
+                      <span>| x{expense.quantity}</span>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pb-3 text-sm flex justify-end">
-                <span className="font-bold text-lg text-red-600">-${Number(expense.amount).toFixed(2)}</span>
+                <span className="font-bold text-lg text-red-600">-{formatCurrency(Number(expense.amount))}</span>
               </CardContent>
               <CardFooter className="flex justify-end border-t pt-3 bg-gray-50/50 rounded-b-lg">
                 <Button

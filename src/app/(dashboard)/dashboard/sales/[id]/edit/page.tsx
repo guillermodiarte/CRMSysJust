@@ -73,6 +73,8 @@ export default function EditSalePage() {
         clientName: data.clientName,
         clientPhone: data.clientPhone || "",
         isGift: data.isGift,
+        isLost: data.isLost, // Added
+        notes: data.notes || "", // Added
         items: formItems
       });
       setFetching(false);
@@ -86,11 +88,13 @@ export default function EditSalePage() {
       clientName: data.clientName,
       clientPhone: data.clientPhone,
       isGift: data.isGift,
+      isLost: data.isLost,
+      notes: data.notes,
       items: data.items.map((i: any) => ({
         productCode: i.productCode,
         stockBatchId: i.stockBatchId,
         quantity: i.quantity,
-        unitPriceSold: i.priceToCharge
+        unitPriceSold: (data.isGift || data.isLost) ? 0 : i.priceToCharge
       }))
     });
 

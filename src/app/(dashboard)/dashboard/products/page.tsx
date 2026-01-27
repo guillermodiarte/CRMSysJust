@@ -40,7 +40,7 @@ import {
 import { Search, Plus, AlertTriangle, Trash2, Pencil, MoreHorizontal, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { getStockBatches, deleteStockBatch, updateStockBatch } from "@/app/actions/stock-actions";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { getSystemConfig } from "@/app/actions/config-actions";
@@ -215,28 +215,28 @@ export default function StockPaged() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-bold">{batch.currentQuantity}</TableCell>
-                    <TableCell className="text-right">${gross.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(gross)}</TableCell>
                     {showDetails && (
                       <>
                         <TableCell className="text-right text-xs text-muted-foreground">
-                          +${(gross * Number(batch.taxRate) / 100).toFixed(2)}
+                          +{formatCurrency(gross * Number(batch.taxRate) / 100)}
                           <br />({Number(batch.taxRate)}%)
                         </TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground">
-                          +${(gross * Number(batch.extraTaxRate) / 100).toFixed(2)}
+                          +{formatCurrency(gross * Number(batch.extraTaxRate) / 100)}
                           <br />({Number(batch.extraTaxRate)}%)
                         </TableCell>
-                        <TableCell className="text-right text-xs text-orange-600">+${Number(batch.shippingCostUnit).toFixed(2)}</TableCell>
+                        <TableCell className="text-right text-xs text-orange-600">+{formatCurrency(Number(batch.shippingCostUnit))}</TableCell>
                       </>
                     )}
-                    <TableCell className="text-right font-bold bg-gray-50">${totalUnitCost.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-bold bg-gray-50">{formatCurrency(totalUnitCost)}</TableCell>
                     <TableCell className="text-right">
                       <span className={Number(batch.product.offerPrice) > 0 ? "line-through text-gray-400" : ""}>
-                        ${Number(batch.product.listPrice).toFixed(2)}
+                        {formatCurrency(Number(batch.product.listPrice))}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-bold text-green-600">
-                      {Number(batch.product.offerPrice) > 0 ? `$${Number(batch.product.offerPrice).toFixed(2)}` : "-"}
+                      {Number(batch.product.offerPrice) > 0 ? formatCurrency(Number(batch.product.offerPrice)) : "-"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className={cn("flex flex-col items-end", status.color)}>
@@ -313,19 +313,19 @@ export default function StockPaged() {
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-xs text-muted-foreground">Costo Total Unit.</span>
-                      <span className="font-bold text-base bg-gray-100 px-2 rounded">${totalUnitCost.toFixed(2)}</span>
+                      <span className="font-bold text-base bg-gray-100 px-2 rounded">{formatCurrency(totalUnitCost)}</span>
                     </div>
 
                     <div className="flex flex-col">
                       <span className="text-xs text-muted-foreground">Precio Lista</span>
                       <span className={cn("font-medium", Number(batch.product.offerPrice) > 0 && "line-through text-gray-400")}>
-                        ${Number(batch.product.listPrice).toFixed(2)}
+                        {formatCurrency(Number(batch.product.listPrice))}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-xs text-muted-foreground">Precio Oferta</span>
                       <span className="font-bold text-green-600">
-                        {Number(batch.product.offerPrice) > 0 ? `$${Number(batch.product.offerPrice).toFixed(2)}` : "-"}
+                        {Number(batch.product.offerPrice) > 0 ? formatCurrency(Number(batch.product.offerPrice)) : "-"}
                       </span>
                     </div>
                   </div>
@@ -334,7 +334,7 @@ export default function StockPaged() {
                     <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <span className="text-muted-foreground block">Costo Bruto</span>
-                        ${gross.toFixed(2)}
+                        {formatCurrency(gross)}
                       </div>
                       <div className="text-center">
                         <span className="text-muted-foreground block">Impuestos</span>
@@ -342,7 +342,7 @@ export default function StockPaged() {
                       </div>
                       <div className="text-right">
                         <span className="text-muted-foreground block text-orange-600">Envío</span>
-                        +${Number(batch.shippingCostUnit).toFixed(2)}
+                        +{formatCurrency(Number(batch.shippingCostUnit))}
                       </div>
                     </div>
                   )}

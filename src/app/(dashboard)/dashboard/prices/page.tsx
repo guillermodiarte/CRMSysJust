@@ -20,13 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -59,42 +60,77 @@ export default function PriceListPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
-  // Special Product State
+  // Special Product & Sales Aid & Limited Edition State
   const [isSpecial, setIsSpecial] = useState(false);
+  const [isSalesAid, setIsSalesAid] = useState(false);
+  const [isLimited, setIsLimited] = useState(false);
   const [codeValue, setCodeValue] = useState("");
 
   // Effect to reset/set code when dialog opens or mode changes
   useEffect(() => {
     if (editingProduct) {
-      // If editing, check if it's already a special product
+      // If editing, check if it's already a special product or sales aid or limited
       const isSpecialCode = editingProduct.code.startsWith("ESPECIAL-");
+      const isSalesAidCode = editingProduct.code.startsWith("ADVENTA-");
+      const isLimitedCode = editingProduct.code.startsWith("ELIMITADA-");
+
       setIsSpecial(isSpecialCode);
+      setIsSalesAid(isSalesAidCode);
+      setIsLimited(isLimitedCode);
       setCodeValue(editingProduct.code);
     } else {
-      if (isSpecial) {
-        const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4 digit random
-        setCodeValue(`ESPECIAL-${randomSuffix}`);
-      } else {
+      // New product: reset flags
+      if (!isOpen) {
+        // Only reset if dialog is closed/ing
+        setIsSpecial(false);
+        setIsSalesAid(false);
+        setIsLimited(false);
         setCodeValue("");
       }
     }
-  }, [editingProduct, isOpen]); // Removed isSpecial from deps to avoid loop when toggling checkbox
+  }, [editingProduct, isOpen]);
 
-  // Handler for Checkbox toggle to update code immediately if needed
+  // Handler for Special Checkbox
   const handleSpecialChange = (checked: boolean) => {
     setIsSpecial(checked);
     if (checked) {
+      setIsSalesAid(false);
+      setIsLimited(false);
       if (editingProduct && editingProduct.code.startsWith("ESPECIAL-")) {
         setCodeValue(editingProduct.code);
       } else {
         const randomSuffix = Math.floor(1000 + Math.random() * 9000);
         setCodeValue(`ESPECIAL-${randomSuffix}`);
       }
-    } else {
-      if (editingProduct) {
+    }
+  };
+
+  // Handler for Sales Aid Checkbox
+  const handleSalesAidChange = (checked: boolean) => {
+    setIsSalesAid(checked);
+    if (checked) {
+      setIsSpecial(false);
+      setIsLimited(false);
+      if (editingProduct && editingProduct.code.startsWith("ADVENTA-")) {
         setCodeValue(editingProduct.code);
       } else {
-        setCodeValue("");
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        setCodeValue(`ADVENTA-${randomSuffix}`);
+      }
+    }
+  };
+
+  // Handler for Limited Checkbox
+  const handleLimitedChange = (checked: boolean) => {
+    setIsLimited(checked);
+    if (checked) {
+      setIsSpecial(false);
+      setIsSalesAid(false);
+      if (editingProduct && editingProduct.code.startsWith("ELIMITADA-")) {
+        setCodeValue(editingProduct.code);
+      } else {
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+        setCodeValue(`ELIMITADA-${randomSuffix}`);
       }
     }
   };
@@ -341,58 +377,109 @@ export default function PriceListPage() {
         <div className="flex flex-wrap gap-2">
 
           <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Vista Previa de Importación</DialogTitle>
+            <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-0 gap-0">
+              <DialogHeader className="px-6 py-4 border-b">
+                <DialogTitle className="text-xl">Vista Previa de Importación</DialogTitle>
+                <DialogDescription>
+                  Revisa los cambios detectados antes de confirmar la actualización.
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Se han detectado {importPreview.length} productos en el archivo.
-                  Revisa los cambios antes de confirmar.
-                </p>
-                <div className="rounded-md border">
+
+              <div className="flex-1 overflow-hidden flex flex-col bg-gray-50/50">
+                {/* Summary Stats & Filters */}
+                <div className="p-4 grid gap-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-white p-3 rounded-lg border shadow-sm flex flex-col items-center justify-center">
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</span>
+                      <span className="text-2xl font-bold">{importPreview.length}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm flex flex-col items-center justify-center border-l-4 border-l-blue-500">
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider text-blue-600">Nuevos</span>
+                      <span className="text-2xl font-bold text-blue-700">{importPreview.filter(i => i.status === 'new').length}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm flex flex-col items-center justify-center border-l-4 border-l-amber-500">
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider text-amber-600">Actualizar</span>
+                      <span className="text-2xl font-bold text-amber-700">{importPreview.filter(i => i.status === 'update').length}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border shadow-sm flex flex-col items-center justify-center border-l-4 border-l-gray-300">
+                      <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Sin Cambios</span>
+                      <span className="text-2xl font-bold text-gray-500">{importPreview.filter(i => i.status === 'unchanged').length}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table Container */}
+                <div className="flex-1 overflow-auto border-t bg-white relative">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Estado</TableHead>
+                    <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-[100px]">Estado</TableHead>
                         <TableHead>Código</TableHead>
-                        <TableHead>Descripción</TableHead>
-                        <TableHead className="text-right">Precio Actual</TableHead>
-                        <TableHead className="text-right">Precio Nuevo</TableHead>
-                        <TableHead className="text-right">Oferta Actual</TableHead>
-                        <TableHead className="text-right">Oferta Nueva</TableHead>
+                        <TableHead className="min-w-[300px]">Descripción</TableHead>
+                        <TableHead className="text-right whitespace-nowrap bg-red-50/30">Precio Lista (Old)</TableHead>
+                        <TableHead className="text-right whitespace-nowrap bg-green-50/30 font-bold">Precio Lista (New)</TableHead>
+                        <TableHead className="text-right whitespace-nowrap bg-red-50/30">Oferta (Old)</TableHead>
+                        <TableHead className="text-right whitespace-nowrap bg-green-50/30 font-bold">Oferta (New)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {importPreview.map((item) => (
-                        <TableRow key={item.code} className={item.status === 'unchanged' ? 'opacity-50' : ''}>
+                        <TableRow key={item.code} className={item.status === 'unchanged' ? 'opacity-40 hover:opacity-100 transition-opacity bg-gray-50' : 'hover:bg-blue-50/30'}>
                           <TableCell>
-                            {item.status === 'new' && <span className="inline-flex items-center rounded-full border border-blue-500 px-2.5 py-0.5 text-xs font-semibold text-blue-500 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">Nuevo</span>}
-                            {item.status === 'update' && <span className="inline-flex items-center rounded-full border border-amber-500 px-2.5 py-0.5 text-xs font-semibold text-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">Actualizar</span>}
-                            {item.status === 'unchanged' && <span className="text-xs text-muted-foreground">Sin cambios</span>}
+                            {item.status === 'new' && (
+                              <span className="inline-flex items-center justify-center rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                NUEVO
+                              </span>
+                            )}
+                            {item.status === 'update' && (
+                              <span className="inline-flex items-center justify-center rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                UPDATE
+                              </span>
+                            )}
+                            {item.status === 'unchanged' && (
+                              <span className="inline-flex items-center justify-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                                IGUAL
+                              </span>
+                            )}
                           </TableCell>
-                          <TableCell className="font-medium">{item.code}</TableCell>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell className="text-right">
-                            {item.currentListPrice !== null ? `$${item.currentListPrice}` : "-"}
+                          <TableCell className="font-mono text-sm font-medium text-muted-foreground">
+                            {item.code}
                           </TableCell>
-                          <TableCell className={`text-right ${item.status === 'update' && item.currentListPrice !== item.newListPrice ? 'font-bold text-amber-600' : ''}`}>
-                            ${item.newListPrice}
+                          <TableCell className="font-medium">
+                            {item.description}
                           </TableCell>
-                          <TableCell className="text-right">
-                            {item.currentOfferPrice !== null && item.currentOfferPrice > 0 ? `$${item.currentOfferPrice}` : "-"}
+
+                          {/* List Prices */}
+                          <TableCell className="text-right text-muted-foreground bg-red-50/10 font-mono text-xs">
+                            {item.currentListPrice !== null ? formatCurrency(item.currentListPrice) : "-"}
                           </TableCell>
-                          <TableCell className={`text-right ${item.status === 'update' && item.currentOfferPrice !== item.newOfferPrice ? 'font-bold text-amber-600' : ''}`}>
-                            {item.newOfferPrice > 0 ? `$${item.newOfferPrice}` : "-"}
+                          <TableCell className={cn("text-right font-mono text-sm bg-green-50/10", item.status === 'update' && item.currentListPrice !== item.newListPrice ? 'font-bold text-green-700' : '')}>
+                            {formatCurrency(item.newListPrice)}
+                          </TableCell>
+
+                          {/* Offer Prices */}
+                          <TableCell className="text-right text-muted-foreground bg-red-50/10 font-mono text-xs">
+                            {item.currentOfferPrice !== null && item.currentOfferPrice > 0 ? formatCurrency(item.currentOfferPrice) : "-"}
+                          </TableCell>
+                          <TableCell className={cn("text-right font-mono text-sm bg-green-50/10", item.status === 'update' && item.currentOfferPrice !== item.newOfferPrice ? 'font-bold text-green-700' : '')}>
+                            {item.newOfferPrice > 0 ? formatCurrency(item.newOfferPrice) : "-"}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="flex justify-end gap-2">
+              </div>
+
+              <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+                <p className="text-xs text-muted-foreground">
+                  Los productos marcados como "NUEVO" se crearán. Los "UPDATE" actualizarán precios. "IGUAL" se ignorarán.
+                </p>
+                <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Cancelar</Button>
-                  <Button onClick={confirmImport}>Confirmar Importación</Button>
+                  <Button onClick={confirmImport} className="bg-blue-600 hover:bg-blue-700">
+                    Confirmar Importación ({importPreview.filter(i => i.status !== 'unchanged').length} cambios)
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -465,28 +552,52 @@ export default function PriceListPage() {
                 <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="special"
-                    checked={isSpecial}
-                    onCheckedChange={(checked) => handleSpecialChange(checked as boolean)}
-                  />
-                  <Label htmlFor="special" className="cursor-pointer">Producto Especial (Código autogenerado)</Label>
+                <div className="flex flex-col gap-2 mb-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="special"
+                      checked={isSpecial}
+                      onCheckedChange={(checked) => handleSpecialChange(checked as boolean)}
+                      disabled={isSalesAid || isLimited}
+                    />
+                    <Label htmlFor="special" className="cursor-pointer">Producto Especial (Código autogenerado)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="sales_aid"
+                      checked={isSalesAid}
+                      onCheckedChange={(checked) => handleSalesAidChange(checked as boolean)}
+                      disabled={isSpecial || isLimited}
+                    />
+                    <Label htmlFor="sales_aid" className="cursor-pointer">Ayuda de Venta (Código autogenerado)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="limited"
+                      checked={isLimited}
+                      onCheckedChange={(checked) => handleLimitedChange(checked as boolean)}
+                      disabled={isSpecial || isSalesAid}
+                    />
+                    <Label htmlFor="limited" className="cursor-pointer">Edición Limitada (Código autogenerado)</Label>
+                  </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="code">Código</Label>
                   <Input
-                    name={isSpecial ? "code_display" : "code"}
+                    name={(isSpecial || isSalesAid || isLimited) ? "code_display" : "code"}
                     id="code"
                     required
-                    value={isSpecial ? "ESPECIAL" : codeValue}
+                    value={isSpecial ? "ESPECIAL" : isSalesAid ? "AYUDA DE VENTA" : isLimited ? "EDICION LIMITADA" : codeValue}
                     onChange={(e) => setCodeValue(e.target.value)}
-                    readOnly={isSpecial}
-                    className={isSpecial ? "bg-muted font-mono" : ""}
+                    readOnly={isSpecial || isSalesAid || isLimited}
+                    className={(isSpecial || isSalesAid || isLimited) ? "bg-muted font-mono" : ""}
                     placeholder="Ej: OLEO31"
                   />
-                  {isSpecial && <input type="hidden" name="code" value={codeValue} />}
+                  {(isSpecial || isSalesAid || isLimited) && <input type="hidden" name="code" value={codeValue} />}
                   {isSpecial && <p className="text-xs text-muted-foreground">El código interno es único ({codeValue}), pero se mostrará como ESPECIAL.</p>}
+                  {isSalesAid && <p className="text-xs text-muted-foreground">El código interno es único ({codeValue}), pero se mostrará como AYUDA DE VENTA.</p>}
+                  {isLimited && <p className="text-xs text-muted-foreground">El código interno es único ({codeValue}), pero se mostrará como Edición Limitada.</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Descripción</Label>
@@ -515,6 +626,7 @@ export default function PriceListPage() {
                     min="0"
                     defaultValue={editingProduct && !isNaN(Number(editingProduct.offerPrice)) ? Number(editingProduct.offerPrice).toString() : ""}
                     placeholder="0.00"
+                    disabled={isSalesAid || codeValue.startsWith("ADVENTA-")}
                   />
                   <p className="text-xs text-muted-foreground">Si se establece mayor a 0, se mostrará como el precio actual.</p>
                 </div>
@@ -576,16 +688,25 @@ export default function PriceListPage() {
               products.map((product) => (
                 <TableRow key={product.code}>
                   <TableCell className="font-medium">
-                    {product.code.startsWith("ESPECIAL-") ? "ESPECIAL" : product.code}
+                    <div className="flex flex-col">
+                      <span>
+                        {product.code.startsWith("ESPECIAL-") ? "ESPECIAL" : product.code.startsWith("ADVENTA-") ? "AYUDA DE VENTA" : product.code.startsWith("ELIMITADA-") ? "EDICIÓN LIMITADA" : product.code}
+                      </span>
+                      {(product.code.startsWith("ESPECIAL-") || product.code.startsWith("ADVENTA-") || product.code.startsWith("ELIMITADA-")) && (
+                        <span className="text-[10px] text-muted-foreground font-mono leading-tight">
+                          {product.code}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{product.description}</TableCell>
                   <TableCell className="text-right">
                     <span className={Number(product.offerPrice) > 0 ? "line-through text-gray-400" : ""}>
-                      ${Number(Number(product.listPrice).toFixed(2))}
+                      {formatCurrency(Number(product.listPrice))}
                     </span>
                   </TableCell>
                   <TableCell className="text-right font-bold text-green-600">
-                    {Number(product.offerPrice) > 0 ? `$${Number(Number(product.offerPrice).toFixed(2))}` : "-"}
+                    {Number(product.offerPrice) > 0 ? formatCurrency(Number(product.offerPrice)) : "-"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(product)}>
@@ -615,9 +736,16 @@ export default function PriceListPage() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <CardTitle className="text-lg font-bold">{product.description}</CardTitle>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {product.code.startsWith("ESPECIAL-") ? "ESPECIAL" : product.code}
-                    </p>
+                    <div className="flex flex-col">
+                      <p className="text-xs text-muted-foreground font-bold">
+                        {product.code.startsWith("ESPECIAL-") ? "ESPECIAL" : product.code.startsWith("ADVENTA-") ? "AYUDA DE VENTA" : product.code.startsWith("ELIMITADA-") ? "EDICIÓN LIMITADA" : product.code}
+                      </p>
+                      {(product.code.startsWith("ESPECIAL-") || product.code.startsWith("ADVENTA-") || product.code.startsWith("ELIMITADA-")) && (
+                        <p className="text-[10px] text-muted-foreground font-mono">
+                          {product.code}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -626,13 +754,13 @@ export default function PriceListPage() {
                   <div className="flex flex-col">
                     <span className="text-xs text-muted-foreground">Precio Lista</span>
                     <span className={cn("font-medium", Number(product.offerPrice) > 0 && "line-through text-gray-400")}>
-                      ${Number(Number(product.listPrice).toFixed(2))}
+                      {formatCurrency(Number(product.listPrice))}
                     </span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-xs text-muted-foreground">Precio Oferta</span>
                     <span className="font-bold text-lg text-green-600">
-                      {Number(product.offerPrice) > 0 ? `$${Number(Number(product.offerPrice).toFixed(2))}` : "-"}
+                      {Number(product.offerPrice) > 0 ? formatCurrency(Number(product.offerPrice)) : "-"}
                     </span>
                   </div>
                 </div>
@@ -649,6 +777,6 @@ export default function PriceListPage() {
           ))
         )}
       </div>
-    </div>
+    </div >
   );
 }

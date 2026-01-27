@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Trash2, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { createStockEntry, StockEntryItem } from "@/app/actions/stock-actions";
 import { getSystemConfig } from "@/app/actions/config-actions";
@@ -50,8 +50,8 @@ export default function NewStockEntryPage() {
     setItems([...items, {
       code: product.code,
       quantity: 1,
-      costGross: 0,
-      expirationDate: "",
+      costGross: product.code.startsWith("ADVENTA-") ? product.listPrice : 0,
+      expirationDate: product.code.startsWith("ADVENTA-") ? "2125-01-01" : "",
     }]);
     setOpen(false);
   };
@@ -75,7 +75,7 @@ export default function NewStockEntryPage() {
     // Validate
     for (const item of items) {
       if (!item.quantity || item.quantity <= 0) { toast.error("Cantidad inválida"); return; }
-      if (!item.costGross || item.costGross < 0) { toast.error("Costo inválido"); return; }
+      if (item.costGross < 0 || item.costGross === undefined) { toast.error("Costo inválido"); return; }
       if (!item.expirationDate) { toast.error("Falta fecha de vencimiento"); return; }
     }
 
@@ -152,38 +152,38 @@ export default function NewStockEntryPage() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Suma Costos Producto:</span>
-              <span className="font-bold">${totalProductCost.toFixed(2)}</span>
+              <span className="font-bold">{formatCurrency(totalProductCost)}</span>
             </div>
             <div className="flex justify-between text-orange-600">
               <span>+ Costo de Envío:</span>
-              <span>${shippingCostTotal.toFixed(2)}</span>
+              <span>{formatCurrency(shippingCostTotal)}</span>
             </div>
             <div className="flex justify-between text-green-600">
               <span>- Descuento Incentivo:</span>
-              <span>${incentiveDiscountTotal.toFixed(2)}</span>
+              <span>{formatCurrency(incentiveDiscountTotal)}</span>
             </div>
             <div className="border-t my-2 pt-2 flex justify-between font-semibold">
               <span>Subtotal:</span>
-              <span>${subtotalBase.toFixed(2)}</span>
+              <span>{formatCurrency(subtotalBase)}</span>
             </div>
 
             <div className="flex justify-between text-muted-foreground">
               <span>+ IVA ({config.ivaPercentage}%):</span>
-              <span>${totalIva.toFixed(2)}</span>
+              <span>{formatCurrency(totalIva)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>+ Impuesto Extra ({config.extraTaxPercentage}%):</span>
-              <span>${totalExtraTax.toFixed(2)}</span>
+              <span>{formatCurrency(totalExtraTax)}</span>
             </div>
 
             <div className="flex justify-between text-xs text-gray-400">
               <span>Redondeo:</span>
-              <span>${roundingDiff.toFixed(2)}</span>
+              <span>{formatCurrency(roundingDiff)}</span>
             </div>
 
             <div className="border-t pt-2 mt-2 flex justify-between font-bold text-lg bg-gray-50 p-2 rounded">
               <span>Total Final:</span>
-              <span>${totalInvoice.toFixed(2)}</span>
+              <span>{formatCurrency(totalInvoice)}</span>
             </div>
           </CardContent>
         </Card>
@@ -207,7 +207,7 @@ export default function NewStockEntryPage() {
                     {products.map((product) => (
                       <CommandItem
                         key={product.code}
-                        value={`${product.description} ${product.code}`}
+                        value={`${product.description} ${product.code} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
                         onSelect={() => addItem(product)}
                       >
                         <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
@@ -265,7 +265,11 @@ export default function NewStockEntryPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Input type="date" value={item.expirationDate} onChange={e => updateItem(index, "expirationDate", e.target.value)} />
+                          {item.code.startsWith("ADVENTA-") ? (
+                            <span className="text-xs text-muted-foreground italic pl-2">No Vence</span>
+                          ) : (
+                            <Input type="date" value={item.expirationDate} onChange={e => updateItem(index, "expirationDate", e.target.value)} />
+                          )}
                         </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" onClick={() => removeItem(index)}>
@@ -330,12 +334,16 @@ export default function NewStockEntryPage() {
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Vencimiento</Label>
-                        <Input
-                          type="date"
-                          value={item.expirationDate}
-                          onChange={e => updateItem(index, "expirationDate", e.target.value)}
-                          className="h-9"
-                        />
+                        {item.code.startsWith("ADVENTA-") ? (
+                          <div className="h-9 flex items-center text-sm text-muted-foreground italic">No Vence</div>
+                        ) : (
+                          <Input
+                            type="date"
+                            value={item.expirationDate}
+                            onChange={e => updateItem(index, "expirationDate", e.target.value)}
+                            className="h-9"
+                          />
+                        )}
                       </div>
                     </CardContent>
                   </Card>

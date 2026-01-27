@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Check, Plus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { createSale, getProductsWithStock, getAvailableStock } from "@/app/actions/sales-actions";
 import { format } from "date-fns";
@@ -65,7 +65,9 @@ export default function NewSalePage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [notes, setNotes] = useState("");
   const [isGift, setIsGift] = useState(false);
+  const [isLost, setIsLost] = useState(false);
 
   // Items
   const [items, setItems] = useState<SaleItemRow[]>([]);
@@ -128,8 +130,9 @@ export default function NewSalePage() {
 
     // Recalculate Profit if Cost or PriceToCharge changes (or Batch implied cost change)
     if (field === "stockBatchId" || field === "priceToCharge") {
+      const safePrice = isNaN(item.priceToCharge) ? 0 : item.priceToCharge;
       item.profitPercentage = item.costPrice > 0
-        ? ((item.priceToCharge - item.costPrice) / item.costPrice) * 100
+        ? ((safePrice - item.costPrice) / item.costPrice) * 100
         : 0;
     }
 
@@ -158,12 +161,14 @@ export default function NewSalePage() {
       date,
       clientName,
       clientPhone,
+      notes,
       isGift,
+      isLost,
       items: items.map(i => ({
         productCode: i.productCode,
         stockBatchId: i.stockBatchId,
         quantity: i.quantity,
-        unitPriceSold: i.priceToCharge // Map to backend field
+        unitPriceSold: (isGift || isLost) ? 0 : i.priceToCharge // Map to backend field
       }))
     });
 
@@ -177,7 +182,7 @@ export default function NewSalePage() {
     }
   };
 
-  const totalAmount = items.reduce((acc, i) => acc + (i.quantity * i.priceToCharge), 0);
+  const totalAmount = items.reduce((acc, i) => acc + (i.quantity * (isNaN(i.priceToCharge) ? 0 : i.priceToCharge)), 0);
 
   return (
     <div className="space-y-6 pb-20">
@@ -195,17 +200,63 @@ export default function NewSalePage() {
             </div>
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Input placeholder="Nombre y Apellido" value={clientName} onChange={e => setClientName(e.target.value)} />
+              <Input
+                placeholder="Nombre y Apellido"
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+                disabled={isLost}
+              />
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
-              <Input placeholder="Opcional" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+              <Input
+                placeholder="Opcional"
+                value={clientPhone}
+                onChange={e => setClientPhone(e.target.value)}
+                disabled={isLost}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Observaciones / Anotaciones</Label>
+              <Input
+                placeholder="Detalles relevantes de la venta..."
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+              />
             </div>
             <div className="flex items-center space-x-2 pt-2">
-              <Checkbox id="isGift" checked={isGift} onCheckedChange={(c) => setIsGift(!!c)} />
+              <Checkbox
+                id="isGift"
+                checked={isGift}
+                disabled={isLost}
+                onCheckedChange={(c) => {
+                  const checked = !!c;
+                  setIsGift(checked);
+                }}
+              />
               <Label htmlFor="isGift" className="font-bold">¿Es un Regalo?</Label>
             </div>
-            {isGift && <p className="text-sm text-purple-600">El precio de venta de los productos será $0.00</p>}
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="isLost"
+                checked={isLost}
+                disabled={isGift}
+                onCheckedChange={(c) => {
+                  const checked = !!c;
+                  setIsLost(checked);
+                  if (checked) {
+                    setClientName("Perdida/Roto"); // Auto-fill
+                    setClientPhone(""); // Clear phone
+                  } else {
+                    setClientName(""); // Clear
+                  }
+                }}
+              />
+              <Label htmlFor="isLost" className="font-bold text-red-600">Stock Perdido/Roto</Label>
+            </div>
+            {(isGift || isLost) && <p className="text-sm text-purple-600">El precio de venta de los productos será $0.00</p>}
+
+
           </CardContent>
         </Card>
 
@@ -216,13 +267,13 @@ export default function NewSalePage() {
           <CardContent className="space-y-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total a Cobrar:</span>
-              <span>${isGift ? "0.00" : totalAmount.toFixed(2)}</span>
+              <span>{(isGift || isLost) ? "$0.00" : formatCurrency(totalAmount)}</span>
             </div>
-            {isGift && <div className="text-sm text-muted-foreground">
-              Costo real del regalo: ${items.reduce((acc, i) => acc + (i.quantity * i.costPrice), 0).toFixed(2)}
+            {(isGift || isLost) && <div className="text-sm text-muted-foreground">
+              Costo real {isGift ? "del regalo" : "de la pérdida"}: {formatCurrency(items.reduce((acc, i) => acc + (i.quantity * i.costPrice), 0))}
             </div>}
             <Button className="w-full mt-4" size="lg" onClick={handleSubmit} disabled={loading}>
-              {loading ? "Procesando..." : "Confirmar Venta"}
+              {loading ? "Procesando..." : (isLost ? "Confirmar Pérdida" : (isGift ? "Confirmar Regalo" : "Confirmar Venta"))}
             </Button>
             <Button className="w-full mt-2" variant="outline" onClick={() => router.push("/dashboard/sales")}>
               Cancelar
@@ -250,7 +301,7 @@ export default function NewSalePage() {
                       {products.map((product) => (
                         <CommandItem
                           key={product.code}
-                          value={`${product.description} ${product.code}`}
+                          value={`${product.description} ${product.code} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
                           onSelect={() => addItem(product)}
                         >
                           <Check className={cn("mr-2 h-4 w-4", items.some(i => i.productCode === product.code) ? "opacity-100" : "opacity-0")} />
@@ -329,29 +380,29 @@ export default function NewSalePage() {
                         />
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        ${item.costPrice.toFixed(2)}
+                        {formatCurrency(item.costPrice)}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        ${item.listPrice.toFixed(2)}
+                        {formatCurrency(item.listPrice)}
                       </TableCell>
                       <TableCell className="text-right text-green-600 font-medium">
-                        {item.offerPrice > 0 ? `$${item.offerPrice.toFixed(2)}` : "-"}
+                        {item.offerPrice > 0 ? formatCurrency(item.offerPrice) : "-"}
                       </TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.priceToCharge}
+                          value={(isGift || isLost) ? 0 : (isNaN(item.priceToCharge) ? "" : item.priceToCharge)}
                           onChange={e => updateItem(index, "priceToCharge", parseFloat(e.target.value))}
-                          disabled={isGift}
+                          disabled={isGift || isLost}
                           className="text-right font-bold w-24 ml-auto"
                         />
                       </TableCell>
-                      <TableCell className={cn("text-right text-xs font-bold", item.profitPercentage < 30 ? "text-red-500" : "text-green-600")}>
-                        {item.profitPercentage.toFixed(1)}%
+                      <TableCell className={cn("text-right text-xs font-bold", ((isGift || isLost) ? -100 : item.profitPercentage) < 30 ? "text-red-500" : "text-green-600")}>
+                        {((isGift || isLost) ? -100 : item.profitPercentage).toFixed(1)}%
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        ${isGift ? "0.00" : (item.quantity * item.priceToCharge).toFixed(2)}
+                        {(isGift || isLost) ? "$0.00" : formatCurrency(item.quantity * item.priceToCharge)}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -444,9 +495,9 @@ export default function NewSalePage() {
                         <Input
                           type="number"
                           step="0.01"
-                          value={item.priceToCharge}
+                          value={(isGift || isLost) ? 0 : (isNaN(item.priceToCharge) ? "" : item.priceToCharge)}
                           onChange={e => updateItem(index, "priceToCharge", parseFloat(e.target.value))}
-                          disabled={isGift}
+                          disabled={isGift || isLost}
                           className="h-9 text-right font-bold"
                         />
                       </div>
@@ -457,17 +508,17 @@ export default function NewSalePage() {
                       <div className="space-y-1">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Lista:</span>
-                          <span>${item.listPrice.toFixed(2)}</span>
+                          <span>{formatCurrency(item.listPrice)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Oferta:</span>
                           <span className={cn(item.offerPrice > 0 ? "text-green-600 font-bold" : "")}>
-                            {item.offerPrice > 0 ? `$${item.offerPrice.toFixed(2)}` : "-"}
+                            {item.offerPrice > 0 ? formatCurrency(item.offerPrice) : "-"}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Costo:</span>
-                          <span>${item.costPrice.toFixed(2)}</span>
+                          <span>{formatCurrency(item.costPrice)}</span>
                         </div>
                       </div>
 
@@ -481,7 +532,7 @@ export default function NewSalePage() {
                         </div>
                         <div className="flex justify-between items-center mt-2">
                           <span className="font-bold text-base">Total:</span>
-                          <span className="font-bold text-base">${isGift ? "0.00" : (item.quantity * item.priceToCharge).toFixed(2)}</span>
+                          <span className="font-bold text-base">{(isGift || isLost) ? "$0.00" : formatCurrency(item.quantity * item.priceToCharge)}</span>
                         </div>
                       </div>
                     </div>

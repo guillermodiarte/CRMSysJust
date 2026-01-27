@@ -24,24 +24,34 @@ export async function getExpenses(month?: number, year?: number) {
       },
     });
 
-    return expenses;
+    return expenses.map(e => ({
+      ...e,
+      amount: Number(e.amount)
+    }));
   } catch (error) {
     console.error("Error fetching expenses:", error);
     return [];
   }
 }
 
-export async function createExpense(data: { description: string; amount: number; date: Date }) {
+export async function createExpense(data: { description: string; amount: number; date: Date; quantity?: number }) {
   try {
     const newExpense = await prisma.expense.create({
       data: {
         description: data.description,
         amount: data.amount,
         date: data.date,
+        quantity: data.quantity || 1
       },
     });
     revalidatePath("/dashboard/sales-help");
-    return { success: true, expense: newExpense };
+    return {
+      success: true,
+      expense: {
+        ...newExpense,
+        amount: Number(newExpense.amount)
+      }
+    };
   } catch (error) {
     console.error("Error creating expense:", error);
     return { success: false, error: "Error al crear el gasto" };
@@ -54,6 +64,7 @@ export async function deleteExpense(id: string) {
       where: { id },
     });
     revalidatePath("/dashboard/sales-help");
+    revalidatePath("/dashboard/finance");
     return { success: true };
   } catch (error) {
     console.error("Error deleting expense:", error);

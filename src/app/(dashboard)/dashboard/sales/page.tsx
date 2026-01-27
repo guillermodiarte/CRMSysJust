@@ -20,16 +20,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Gift, Trash2, Edit } from "lucide-react";
+import { Plus, Gift, Trash2, Edit, StickyNote, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { getSales, deleteSale } from "@/app/actions/sales-actions";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -46,6 +51,7 @@ export default function SalesPage() {
   const [year, setYear] = useState<string>(String(currentYear));
   const [search, setSearch] = useState("");
   const [onlyGifts, setOnlyGifts] = useState(false);
+  const [onlyLost, setOnlyLost] = useState(false);
   const [yearRange, setYearRange] = useState<number[]>([currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4]);
 
   const [deleteSaleId, setDeleteSaleId] = useState<string | null>(null);
@@ -64,7 +70,7 @@ export default function SalesPage() {
   }, []);
 
   const loadData = async () => {
-    const data = await getSales(Number(month), Number(year), search, onlyGifts);
+    const data = await getSales(Number(month), Number(year), search, onlyGifts, onlyLost);
     setSales(data);
   };
 
@@ -86,7 +92,7 @@ export default function SalesPage() {
       loadData();
     }, 300);
     return () => clearTimeout(timer);
-  }, [month, year, search, onlyGifts]);
+  }, [month, year, search, onlyGifts, onlyLost]);
 
   return (
     <div className="space-y-6">
@@ -111,17 +117,28 @@ export default function SalesPage() {
         </div>
 
         <div className="flex items-center gap-2 border-l pl-4 border-r pr-4">
-          <Checkbox
-            id="gift-filter"
-            checked={onlyGifts}
-            onCheckedChange={(c) => setOnlyGifts(!!c)}
-          />
-          <Label htmlFor="gift-filter" className="cursor-pointer">Solo Regalos</Label>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="gift-filter"
+              checked={onlyGifts}
+              onCheckedChange={(c) => setOnlyGifts(!!c)}
+            />
+            <Label htmlFor="gift-filter" className="cursor-pointer">Solo Regalos</Label>
+          </div>
+
+          <div className="flex items-center gap-2 ml-4">
+            <Checkbox
+              id="lost-filter"
+              checked={onlyLost}
+              onCheckedChange={(c) => setOnlyLost(!!c)}
+            />
+            <Label htmlFor="lost-filter" className="cursor-pointer text-red-600">Solo Pérdidas</Label>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${onlyGifts ? "text-muted-foreground" : ""}`}>Periodo:</span>
-          <Select value={month} onValueChange={setMonth} disabled={onlyGifts}>
+          <span className={`text-sm font-medium ${(onlyGifts || onlyLost) ? "text-muted-foreground" : ""}`}>Periodo:</span>
+          <Select value={month} onValueChange={setMonth} disabled={onlyGifts || onlyLost}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Mes" />
             </SelectTrigger>
@@ -133,7 +150,7 @@ export default function SalesPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={year} onValueChange={setYear} disabled={onlyGifts}>
+          <Select value={year} onValueChange={setYear} disabled={onlyGifts || onlyLost}>
             <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Año" />
             </SelectTrigger>
@@ -174,12 +191,29 @@ export default function SalesPage() {
                 const profitPercent = totalSale > 0 ? (profit / totalSale) * 100 : 0;
 
                 return (
-                  <TableRow key={sale.id} className={sale.isGift ? "bg-purple-50" : ""}>
+                  <TableRow key={sale.id} className={sale.isGift ? "bg-purple-50" : (sale.isLost ? "bg-red-50" : "")}>
                     <TableCell>{format(new Date(sale.date), "dd/MM/yy")}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">{sale.clientName}</span>
                         <span className="text-xs text-muted-foreground">{sale.clientPhone}</span>
+                        {sale.notes && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-0 text-blue-500 justify-start hover:text-blue-700 hover:bg-transparent"
+                              >
+                                <StickyNote className="w-3 h-3 mr-1" /> Ver nota
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-4 w-64 text-sm bg-white shadow-lg border rounded-md">
+                              <p className="font-semibold mb-1">Nota:</p>
+                              <p>{sale.notes}</p>
+                            </PopoverContent>
+                          </Popover>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -194,15 +228,19 @@ export default function SalesPage() {
                         <div className="flex items-center justify-end text-purple-600">
                           <Gift className="w-4 h-4 mr-1" /> REGALO
                         </div>
+                      ) : sale.isLost ? (
+                        <div className="flex items-center justify-end text-red-600">
+                          <AlertTriangle className="w-4 h-4 mr-1" /> PÉRDIDA
+                        </div>
                       ) : (
-                        `$${totalSale.toFixed(2)}`
+                        formatCurrency(totalSale)
                       )}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
-                      ${totalCost.toFixed(2)}
+                      {formatCurrency(totalCost)}
                     </TableCell>
                     <TableCell className={cn("text-right font-medium", profit < 0 ? "text-red-600" : "text-green-600")}>
-                      ${profit.toFixed(2)}
+                      {formatCurrency(profit)}
                     </TableCell>
                     <TableCell className="text-right text-xs">
                       {sale.isGift ? "0%" : `${profitPercent.toFixed(1)}%`}
@@ -243,7 +281,7 @@ export default function SalesPage() {
             const profitPercent = totalSale > 0 ? (profit / totalSale) * 100 : 0;
 
             return (
-              <Card key={sale.id} className={cn("shadow-sm", sale.isGift ? "bg-purple-50" : "")}>
+              <Card key={sale.id} className={cn("shadow-sm", sale.isGift ? "bg-purple-50" : (sale.isLost ? "bg-red-50" : ""))}>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
@@ -251,10 +289,32 @@ export default function SalesPage() {
                       <p className="text-xs text-muted-foreground font-mono">
                         {format(new Date(sale.date), "dd/MM/yy")}
                       </p>
+                      {sale.notes && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-0 text-blue-500 justify-start hover:text-blue-700 hover:bg-transparent"
+                            >
+                              <StickyNote className="w-3 h-3 mr-1" /> Ver nota
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-4 w-64 text-sm bg-white shadow-lg border rounded-md">
+                            <p className="font-semibold mb-1">Nota:</p>
+                            <p>{sale.notes}</p>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                     {sale.isGift && (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                         <Gift className="w-3 h-3 mr-1" /> REGALO
+                      </span>
+                    )}
+                    {sale.isLost && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <AlertTriangle className="w-3 h-3 mr-1" /> PÉRDIDA
                       </span>
                     )}
                   </div>
@@ -276,7 +336,7 @@ export default function SalesPage() {
                     <div className="flex flex-col">
                       <span className="text-xs text-muted-foreground">Total Venta</span>
                       <span className="font-bold text-lg">
-                        {sale.isGift ? "$0.00" : `$${totalSale.toFixed(2)}`}
+                        {sale.isGift ? "REGALO" : (sale.isLost ? "PÉRDIDA" : formatCurrency(totalSale))}
                       </span>
                     </div>
 
@@ -285,7 +345,7 @@ export default function SalesPage() {
                       <span className="text-xs text-muted-foreground">Ganancia</span>
                       <div className="flex items-center">
                         <span className={cn("font-medium", profit < 0 ? "text-red-600" : "text-green-600")}>
-                          ${profit.toFixed(2)}
+                          {formatCurrency(profit)}
                         </span>
                         <span className="text-xs text-muted-foreground ml-1">
                           ({sale.isGift ? "0%" : `${profitPercent.toFixed(1)}%`})
@@ -329,6 +389,8 @@ export default function SalesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+
+
+    </div >
   );
 }

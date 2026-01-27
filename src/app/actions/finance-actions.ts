@@ -18,6 +18,7 @@ export async function getFinanceMetrics(month: number, year: number) {
   const revenue = sales.reduce((acc, sale) => acc + Number(sale.totalAmount), 0);
 
   // 2. Total Expenses (Compras de Stock) -> Cash Flow View
+  // 2.a Stock Purchases
   const batches = await prisma.stockBatch.findMany({
     where: { entryDate: { gte: startDate, lte: endDate } }
   });
@@ -30,23 +31,33 @@ export async function getFinanceMetrics(month: number, year: number) {
     expenses += unitCostTotal * batch.initialQuantity;
   }
 
+  // 2.b Operational Expenses (Sales Aid)
+  const operationalExpenses = await prisma.expense.findMany({
+    where: { date: { gte: startDate, lte: endDate } }
+  });
+  const operationalExpensesTotal = operationalExpenses.reduce((acc, curr) => acc + Number(curr.amount), 0);
+  expenses += operationalExpensesTotal;
 
 
-  // 3. Sales Cost vs Gift Cost
+
+  // 3. Sales Cost vs Gift Cost vs Loss Cost
   let salesCost = 0;
   let giftCost = 0;
+  let lossCost = 0;
 
   for (const sale of sales) {
     const saleCost = sale.items.reduce((acc, item) => acc + Number(item.totalCostBasis), 0);
 
     if (sale.isGift) {
       giftCost += saleCost;
+    } else if (sale.isLost) {
+      lossCost += saleCost;
     } else {
       salesCost += saleCost;
     }
   }
 
-  // 4. Sales Profit (Pure profit from non-gift sales)
+  // 4. Sales Profit (Pure profit from non-gift/non-lost sales)
   const salesProfit = revenue - salesCost;
 
   // 5. Net Profit (Cash Flow: Revenue - Stock Purchases)
@@ -61,6 +72,7 @@ export async function getFinanceMetrics(month: number, year: number) {
     revenue,
     expenses,
     netProfit, // Cash Flow
+    expenseFromLoss: lossCost,
     giftCost,
     salesCost,
     salesProfit, // New Metric
@@ -77,12 +89,17 @@ export async function getAnnualFinanceMetrics(year: number) {
     include: { items: true }
   });
 
-  // 2. Fetch all expenses (stock) for the year
+  // 2. Fetch all stock purchases for the year
   const batches = await prisma.stockBatch.findMany({
     where: { entryDate: { gte: startDate, lte: endDate } }
   });
 
-  // 3. Aggregate by month
+  // 3. Fetch all operational expenses for the year
+  const operationalExpenses = await prisma.expense.findMany({
+    where: { date: { gte: startDate, lte: endDate } }
+  });
+
+  // 4. Aggregate by month
   const monthlyData = Array.from({ length: 12 }, (_, i) => ({
     name: new Date(year, i, 1).toLocaleString('es-ES', { month: 'short' }), // Ene, Feb, etc.
     revenue: 0,
@@ -101,12 +118,12 @@ export async function getAnnualFinanceMetrics(year: number) {
     const profit = amount - saleCost;
 
     monthlyData[monthIndex].revenue += amount;
-    if (!sale.isGift) {
+    if (!sale.isGift && !sale.isLost) {
       monthlyData[monthIndex].salesProfit += profit;
     }
   }
 
-  // Process Expenses
+  // Process Stock Purchases
   for (const batch of batches) {
     const monthIndex = batch.entryDate.getMonth();
     const gross = Number(batch.costGross);
@@ -115,6 +132,12 @@ export async function getAnnualFinanceMetrics(year: number) {
     const totalExpense = unitCostTotal * batch.initialQuantity;
 
     monthlyData[monthIndex].expenses += totalExpense;
+  }
+
+  // Process Operational Expenses
+  for (const exp of operationalExpenses) {
+    const monthIndex = exp.date.getMonth();
+    monthlyData[monthIndex].expenses += Number(exp.amount);
   }
 
   // Calculate Net Profit (Cash Flow) for each month

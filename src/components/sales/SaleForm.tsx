@@ -46,6 +46,8 @@ type SaleFormProps = {
     clientName: string;
     clientPhone: string;
     isGift: boolean;
+    isLost: boolean; // Added
+    notes: string; // Added
     items: SaleItemRow[];
   };
   onSubmit: (data: any) => Promise<void>;
@@ -65,6 +67,8 @@ export default function SaleForm({ initialData, onSubmit, loading }: SaleFormPro
   const [clientName, setClientName] = useState(initialData?.clientName || "");
   const [clientPhone, setClientPhone] = useState(initialData?.clientPhone || "");
   const [isGift, setIsGift] = useState(initialData?.isGift || false);
+  const [isLost, setIsLost] = useState(initialData?.isLost || false); // Added
+  const [notes, setNotes] = useState(initialData?.notes || ""); // Added
   const [items, setItems] = useState<SaleItemRow[]>(initialData?.items || []);
   const [open, setOpen] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
@@ -176,6 +180,8 @@ export default function SaleForm({ initialData, onSubmit, loading }: SaleFormPro
       clientName,
       clientPhone,
       isGift,
+      isLost, // Added
+      notes, // Added
       items
     });
   };
@@ -196,17 +202,58 @@ export default function SaleForm({ initialData, onSubmit, loading }: SaleFormPro
             </div>
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Input placeholder="Nombre y Apellido" value={clientName} onChange={e => setClientName(e.target.value)} />
+              <Input
+                placeholder="Nombre y Apellido"
+                value={clientName}
+                onChange={e => setClientName(e.target.value)}
+                disabled={isLost}
+              />
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
-              <Input placeholder="Opcional" value={clientPhone} onChange={e => setClientPhone(e.target.value)} />
+              <Input
+                placeholder="Opcional"
+                value={clientPhone}
+                onChange={e => setClientPhone(e.target.value)}
+                disabled={isLost}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Observaciones / Anotaciones</Label>
+              <Input
+                placeholder="Detalles relevantes de la venta..."
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+              />
             </div>
             <div className="flex items-center space-x-2 pt-2">
-              <Checkbox id="isGift" checked={isGift} onCheckedChange={(c) => setIsGift(!!c)} />
+              <Checkbox
+                id="isGift"
+                checked={isGift}
+                disabled={isLost}
+                onCheckedChange={(c) => setIsGift(!!c)}
+              />
               <Label htmlFor="isGift" className="font-bold">¿Es un Regalo?</Label>
             </div>
-            {isGift && <p className="text-sm text-purple-600">El precio de venta de los productos será $0.00</p>}
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox
+                id="isLost"
+                checked={isLost}
+                disabled={isGift}
+                onCheckedChange={(c) => {
+                  const checked = !!c;
+                  setIsLost(checked);
+                  if (checked) {
+                    setClientName("Perdida/Roto");
+                    setClientPhone("");
+                  } else {
+                    setClientName("");
+                  }
+                }}
+              />
+              <Label htmlFor="isLost" className="font-bold text-red-600">Stock Perdido/Roto</Label>
+            </div>
+            {(isGift || isLost) && <p className="text-sm text-purple-600">El precio de venta de los productos será $0.00</p>}
           </CardContent>
         </Card>
 
@@ -217,13 +264,13 @@ export default function SaleForm({ initialData, onSubmit, loading }: SaleFormPro
           <CardContent className="space-y-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total a Cobrar:</span>
-              <span>${isGift ? "0.00" : totalAmount.toFixed(2)}</span>
+              <span>${(isGift || isLost) ? "0.00" : totalAmount.toFixed(2)}</span>
             </div>
-            {isGift && <div className="text-sm text-muted-foreground">
-              Costo real del regalo: ${items.reduce((acc, i) => acc + (i.quantity * i.costPrice), 0).toFixed(2)}
+            {(isGift || isLost) && <div className="text-sm text-muted-foreground">
+              Costo real {isGift ? "del regalo" : "de la pérdida"}: ${items.reduce((acc, i) => acc + (i.quantity * i.costPrice), 0).toFixed(2)}
             </div>}
             <Button className="w-full mt-4" size="lg" onClick={handleSubmit} disabled={loading}>
-              {loading ? "Procesando..." : "Confirmar Venta"}
+              {loading ? "Procesando..." : (isLost ? "Confirmar Pérdida" : (isGift ? "Confirmar Regalo" : "Confirmar Venta"))}
             </Button>
             <Button className="w-full mt-2" variant="outline" onClick={() => router.push("/dashboard/sales")}>
               Cancelar
@@ -342,20 +389,20 @@ export default function SaleForm({ initialData, onSubmit, loading }: SaleFormPro
                         <Input
                           type="number"
                           step="0.01"
-                          value={isNaN(item.priceToCharge) ? "" : item.priceToCharge}
+                          value={(isGift || isLost) ? 0 : (isNaN(item.priceToCharge) ? "" : item.priceToCharge)}
                           onChange={e => {
                             const val = parseFloat(e.target.value);
                             updateItem(index, "priceToCharge", isNaN(val) ? 0 : val);
                           }}
-                          disabled={isGift}
+                          disabled={isGift || isLost}
                           className="text-right font-bold w-24 ml-auto"
                         />
                       </TableCell>
-                      <TableCell className={cn("text-right text-xs font-bold", item.profitPercentage < 30 ? "text-red-500" : "text-green-600")}>
-                        {item.profitPercentage.toFixed(1)}%
+                      <TableCell className={cn("text-right text-xs font-bold", ((isGift || isLost) ? -100 : item.profitPercentage) < 30 ? "text-red-500" : "text-green-600")}>
+                        {((isGift || isLost) ? -100 : item.profitPercentage).toFixed(1)}%
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        ${isGift ? "0.00" : (item.quantity * item.priceToCharge).toFixed(2)}
+                        ${(isGift || isLost) ? "0.00" : (item.quantity * item.priceToCharge).toFixed(2)}
                       </TableCell>
                       <TableCell>
                         <Button
