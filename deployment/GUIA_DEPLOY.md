@@ -86,6 +86,13 @@ Conéctate por SSH a tu servidor.
     pm2 startup
     ```
 
+    **Importante:** Si ya tienes otra aplicación corriendo en el puerto 3000, PM2 puede fallar. 
+    Para cambiar el puerto, define la variable `PORT` antes de iniciar:
+    ```bash
+    PORT=3001 pm2 start ./start.sh --name "crm-just"
+    ```
+    (Y luego ajusta la configuración de Nginx para usar el puerto 3001).
+
 ## 3. Configuración Nginx (Reverse Proxy)
 
 Para acceder mediante tu dominio (ej: `crm.tusitio.com`), configura Nginx para redirigir el tráfico al puerto 3000.

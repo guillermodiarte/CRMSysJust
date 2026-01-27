@@ -9,7 +9,8 @@ export NODE_OPTIONS="--max-old-space-size=512"
 
 # 2. Environment
 export NODE_ENV=production
-export PORT=3000
+# Use PORT from env if set, otherwise default to 3000
+export PORT=${PORT:-3000}
 export HOSTNAME="0.0.0.0"
 
 # Explicitly trust proxy for NextAuth
@@ -51,14 +52,16 @@ if [ -n "$DATABASE_URL" ]; then
 fi
 
 # Critical: Load Environment Variables from file if present
+# Critical: Load Environment Variables from file if present
 if [ -f .env ]; then
   log "Loading configuration from .env..."
-  export $(cat .env | xargs)
+  # Filter lines starting with # and empty lines before exporting
+  export $(grep -v '^#' .env | grep -v '^\s*$' | xargs)
 fi
 
 if [ -f .env.production ]; then
   log "Loading configuration from .env.production..."
-  export $(cat .env.production | xargs)
+  export $(grep -v '^#' .env.production | grep -v '^\s*$' | xargs)
 fi
 
 # Ensure Secret Consistency
