@@ -5,11 +5,11 @@ const prisma = new PrismaClient();
 
 async function main() {
   const admins = [
-    { email: 'admin@crm.com', password: 'admin' }, // Change this in production!
+    { email: 'guillermo.diarte@gmail.com', password: '123456', name: 'Guillermo A. Diarte' },
   ];
 
   for (const admin of admins) {
-    const { email, password } = admin;
+    const { email, password, name } = admin;
     console.log(`>>> Processing admin: ${email}`);
 
     try {
@@ -22,7 +22,7 @@ async function main() {
           data: {
             email,
             password: hashedPassword,
-            name: 'Admin',
+            name: name || 'Admin',
             role: 'ADMIN',
           },
         });
