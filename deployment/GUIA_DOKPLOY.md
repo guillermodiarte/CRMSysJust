@@ -82,3 +82,17 @@ Ve a la pestaña **Volumes** y agrega:
 ### Error en Build
 - Revisa los logs de "Build" en Dokploy.
 - Asegúrate de que `npm run build` funciona en tu local (recuerda que excluimos carpetas extrañas en `tsconfig.json`).
+
+## ☢️ Cómo Resetear la Base de Datos (Deploy desde Cero)
+
+Si necesitas borrar todos los datos y empezar de nuevo en producción:
+
+1.  Ve a tu panel de **Dokploy** -> Tu Aplicación.
+2.  Ve a la pestaña **Console** (o Shell).
+3.  Ejecuta el siguiente comando:
+    ```bash
+    node prisma/seed.js
+    ```
+4.  El script borrará **TODOS** los datos existentes y creará el usuario admin por defecto:
+    - **User:** `guillermo.diarte@gmail.com`
+    - **Pass:** `123456`
