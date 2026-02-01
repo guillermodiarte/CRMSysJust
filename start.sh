@@ -153,12 +153,12 @@ if [ -f ".next/standalone/server.js" ]; then
 
     log "Applying Database Migrations..."
     # Capture db push output and log it. Do not exit on fail, but verify.
-    if npx prisma db push --accept-data-loss; then
+    # Added --skip-generate to avoid re-generating client which might hang or OOM
+    if npx prisma db push --accept-data-loss --skip-generate; then
         log "Migrations successful."
     else
         log "ERROR: Prisma db push failed. Likely permission issues."
-        log "Sleeping 60s to allow log inspection..."
-        sleep 60
+        # We continue anyway to try starting the server, as the DB might be fine
     fi
     
     log "Seeding Admin User..."
