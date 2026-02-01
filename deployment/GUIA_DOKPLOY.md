@@ -23,7 +23,12 @@ DATABASE_URL="file:/app/database/prod.db"
 AUTH_SECRET="tu_clave_secreta_super_segura_crm_just_2026"
 
 # Necesario para que NextAuth confíe en el proxy de Dokploy (HTTPS)
+# Necesario para que NextAuth confíe en el proxy de Dokploy (HTTPS)
 AUTH_TRUST_HOST=true
+
+# URL Canónica de tu sitio (¡Importante para redirecciones!)
+# Reemplaza con tu dominio real (https://...)
+NEXTAUTH_URL="https://tu-dominio.com"
 ```
 
 ### 3. Persistencia (Volúmenes) - ¡CRÍTICO!
