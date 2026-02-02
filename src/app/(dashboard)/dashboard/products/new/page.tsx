@@ -224,7 +224,7 @@ export default function NewStockEntryPage() {
           </Popover>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border overflow-x-auto hidden md:block">
+          <div className="rounded-md border overflow-x-auto hidden 2xl:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -288,7 +288,7 @@ export default function NewStockEntryPage() {
           </div>
 
           {/* Mobile Card View */}
-          <div className="grid grid-cols-1 gap-4 md:hidden">
+          <div className="grid grid-cols-1 gap-4 2xl:hidden">
             {items.length === 0 ? (
               <div className="text-center p-8 bg-white rounded-lg border text-muted-foreground">
                 Agrega productos a la lista
