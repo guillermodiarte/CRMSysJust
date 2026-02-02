@@ -3,6 +3,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { normalizeText } from "@/lib/utils";
 
 const prisma = new PrismaClient();
 
@@ -123,9 +124,7 @@ export async function getSales(month: number, year: number, query?: string, isGi
     };
   }
 
-  if (query) {
-    whereClause.clientName = { contains: query }; // Case insensitive logic depends on DB (SQLite is usually mixed, but contains works)
-  }
+
 
   const sales = await prisma.sale.findMany({
     where: whereClause,
@@ -139,7 +138,12 @@ export async function getSales(month: number, year: number, query?: string, isGi
     orderBy: { date: 'desc' }
   });
 
-  return sales.map(s => ({
+  // In-memory filter for generic accent-insensitive search on Client Name
+  const filteredSales = query
+    ? sales.filter(s => normalizeText(s.clientName).includes(normalizeText(query)))
+    : sales;
+
+  return filteredSales.map(s => ({
     ...s,
     totalAmount: Number(s.totalAmount),
     items: s.items.map(i => ({

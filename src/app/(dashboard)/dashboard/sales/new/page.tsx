@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Check, Plus, Trash2 } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, normalizeText } from "@/lib/utils";
 import { toast } from "sonner";
 import { createSale, getProductsWithStock, getAvailableStock } from "@/app/actions/sales-actions";
 import { format } from "date-fns";
@@ -293,7 +293,10 @@ export default function NewSalePage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] p-0">
-                <Command>
+                <Command filter={(value, search) => {
+                  if (value.includes(normalizeText(search))) return 1;
+                  return 0;
+                }}>
                   <CommandInput placeholder="Buscar..." />
                   <CommandList>
                     <CommandEmpty>No hay stock disponible.</CommandEmpty>
@@ -301,7 +304,7 @@ export default function NewSalePage() {
                       {products.map((product) => (
                         <CommandItem
                           key={product.code}
-                          value={`${product.description} ${product.code} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
+                          value={`${product.description} ${product.code} ${normalizeText(product.description)} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
                           onSelect={() => addItem(product)}
                         >
                           <Check className={cn("mr-2 h-4 w-4", items.some(i => i.productCode === product.code) ? "opacity-100" : "opacity-0")} />
@@ -361,7 +364,7 @@ export default function NewSalePage() {
                           <SelectContent>
                             {item.availableBatches.map(b => (
                               <SelectItem key={b.id} value={b.id}>
-                                Vence {format(new Date(b.expirationDate), "MM/yy")} (Disp: {b.currentQuantity})
+                                Vence {format(new Date(b.expirationDate), "MM/yyyy")} (Disp: {b.currentQuantity})
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -465,7 +468,7 @@ export default function NewSalePage() {
                         <SelectContent>
                           {item.availableBatches.map(b => (
                             <SelectItem key={b.id} value={b.id}>
-                              Vence {format(new Date(b.expirationDate), "MM/yy")} (Disp: {b.currentQuantity})
+                              Vence {format(new Date(b.expirationDate), "MM/yyyy")} (Disp: {b.currentQuantity})
                             </SelectItem>
                           ))}
                         </SelectContent>

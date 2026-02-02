@@ -12,3 +12,10 @@ export function formatCurrency(amount: number) {
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+export function normalizeText(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}

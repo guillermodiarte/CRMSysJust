@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Check, ChevronsUpDown, Trash2, Plus } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, normalizeText } from "@/lib/utils";
 import { toast } from "sonner";
 import { createStockEntry, StockEntryItem } from "@/app/actions/stock-actions";
 import { getSystemConfig } from "@/app/actions/config-actions";
@@ -51,7 +51,7 @@ export default function NewStockEntryPage() {
       code: product.code,
       quantity: 1,
       costGross: product.code.startsWith("ADVENTA-") ? product.listPrice : 0,
-      expirationDate: product.code.startsWith("ADVENTA-") ? "2125-01-01" : "",
+      expirationDate: product.code.startsWith("ADVENTA-") ? "2125-01" : "",
     }]);
     setOpen(false);
   };
@@ -199,7 +199,10 @@ export default function NewStockEntryPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[300px] p-0">
-              <Command>
+              <Command filter={(value, search) => {
+                if (value.includes(normalizeText(search))) return 1;
+                return 0;
+              }}>
                 <CommandInput placeholder="Buscar producto..." />
                 <CommandList>
                   <CommandEmpty>No encontrado.</CommandEmpty>
@@ -207,7 +210,7 @@ export default function NewStockEntryPage() {
                     {products.map((product) => (
                       <CommandItem
                         key={product.code}
-                        value={`${product.description} ${product.code} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
+                        value={`${product.description} ${product.code} ${normalizeText(product.description)} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
                         onSelect={() => addItem(product)}
                       >
                         <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
@@ -268,7 +271,7 @@ export default function NewStockEntryPage() {
                           {item.code.startsWith("ADVENTA-") ? (
                             <span className="text-xs text-muted-foreground italic pl-2">No Vence</span>
                           ) : (
-                            <Input type="date" value={item.expirationDate} onChange={e => updateItem(index, "expirationDate", e.target.value)} />
+                            <Input type="month" value={item.expirationDate} onChange={e => updateItem(index, "expirationDate", e.target.value)} />
                           )}
                         </TableCell>
                         <TableCell>
@@ -338,7 +341,7 @@ export default function NewStockEntryPage() {
                           <div className="h-9 flex items-center text-sm text-muted-foreground italic">No Vence</div>
                         ) : (
                           <Input
-                            type="date"
+                            type="month"
                             value={item.expirationDate}
                             onChange={e => updateItem(index, "expirationDate", e.target.value)}
                             className="h-9"

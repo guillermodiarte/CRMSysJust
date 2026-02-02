@@ -6,41 +6,45 @@ import { revalidatePath } from "next/cache";
 
 const prisma = new PrismaClient();
 
+import { normalizeText } from "@/lib/utils";
+
 export async function getProducts(query?: string) {
-  const conditions: any[] = [
-    { description: { contains: query } },
-    { code: { contains: query } },
-  ];
-
-  const cleanQuery = query ? query.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-
-  // Fuzzy match for "Ayuda de Venta"
-  // If the query is a substring of "ayuda de venta" (min 2 chars), e.g. "ay", "ve", "vent"
-  // OR if it matches "adventa"
-  if (query && (
-    ("ayuda de venta".includes(cleanQuery) && cleanQuery.length >= 2) ||
-    cleanQuery.includes("adventa")
-  )) {
-    conditions.push({ code: { contains: "ADVENTA" } });
-  }
-
-  // Fuzzy match for "Edición Limitada"
-  if (query && (
-    ("edicion limitada".includes(cleanQuery) && cleanQuery.length >= 2) ||
-    cleanQuery.includes("elimitada")
-  )) {
-    conditions.push({ code: { contains: "ELIMITADA" } });
-  }
-
+  // Fetch all products first (optimized for current scale)
   const products = await prisma.productCatalog.findMany({
-    where: query
-      ? {
-        OR: conditions,
-      }
-      : undefined,
     orderBy: { description: "asc" },
   });
-  return products.map(p => ({
+
+  if (!query) {
+    return products.map(p => ({
+      ...p,
+      listPrice: Number(p.listPrice),
+      offerPrice: Number(p.offerPrice),
+    }));
+  }
+
+  const cleanQuery = normalizeText(query);
+
+  const filtered = products.filter(p => {
+    const cleanDesc = normalizeText(p.description);
+    const cleanCode = normalizeText(p.code);
+
+    // Standard Match
+    if (cleanDesc.includes(cleanQuery) || cleanCode.includes(cleanQuery)) return true;
+
+    // Fuzzy match for "Ayuda de Venta"
+    if (("ayuda de venta".includes(cleanQuery) && cleanQuery.length >= 2) || cleanQuery.includes("adventa")) {
+      if (cleanCode.includes("adventa")) return true;
+    }
+
+    // Fuzzy match for "Edición Limitada"
+    if (("edicion limitada".includes(cleanQuery) && cleanQuery.length >= 2) || cleanQuery.includes("elimitada")) {
+      if (cleanCode.includes("elimitada")) return true;
+    }
+
+    return false;
+  });
+
+  return filtered.map(p => ({
     ...p,
     listPrice: Number(p.listPrice),
     offerPrice: Number(p.offerPrice),

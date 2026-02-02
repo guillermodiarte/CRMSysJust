@@ -84,7 +84,7 @@ export default function StockPaged() {
     setEditForm({
       currentQuantity: batch.currentQuantity,
       offerPrice: Number(batch.offerPrice),
-      expirationDate: new Date(batch.expirationDate).toISOString().split('T')[0]
+      expirationDate: new Date(batch.expirationDate).toISOString().slice(0, 7)
     });
     setIsEditOpen(true);
   };
@@ -240,7 +240,7 @@ export default function StockPaged() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className={cn("flex flex-col items-end", status.color)}>
-                        <span>{format(new Date(batch.expirationDate), "MM/yy")}</span>
+                        <span>{format(new Date(batch.expirationDate), "MM/yyyy")}</span>
                         {status.label !== "OK" && (
                           <span className="text-[10px] flex items-center">
                             <AlertTriangle className="w-3 h-3 mr-1" /> {status.label}
@@ -301,7 +301,7 @@ export default function StockPaged() {
                       status.label === "OK" ? "bg-green-100 text-green-700" :
                         status.label === "VENCIDO" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
                     )}>
-                      {status.label === "OK" ? format(new Date(batch.expirationDate), "MM/yy") : status.label}
+                      {status.label === "OK" ? format(new Date(batch.expirationDate), "MM/yyyy") : status.label}
                     </div>
                   </div>
                 </CardHeader>
@@ -424,7 +424,7 @@ export default function StockPaged() {
               </Label>
               <Input
                 id="exp"
-                type="date"
+                type="month"
                 className="col-span-3"
                 value={editForm.expirationDate}
                 onChange={(e) => setEditForm({ ...editForm, expirationDate: e.target.value })}

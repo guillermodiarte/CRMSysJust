@@ -200,29 +200,36 @@ export async function createStockEntry(payload: StockEntryPayload) {
 
 import { addMonths, isBefore } from "date-fns";
 
+import { normalizeText } from "@/lib/utils";
+
 export async function getStockBatches(searchParam?: string) {
-  const search = searchParam ? String(searchParam) : undefined;
+  const search = searchParam ? normalizeText(searchParam) : undefined;
 
   // Get config for Expiry Alert
   const config = await prisma.systemConfig.findFirst() || { expiryAlertMonths: 3 };
   const expiryThreshold = addMonths(new Date(), config.expiryAlertMonths);
 
-  const res = await prisma.stockBatch.findMany({
+  // Fetch all available stock first
+  const allBatches = await prisma.stockBatch.findMany({
     where: {
       currentQuantity: { gt: 0 },
-      OR: search ? [
-        { product: { description: { contains: search } } },
-        { productCode: { contains: search } }
-      ] : undefined
     },
     include: {
       product: true,
     },
-    // Initial sort by expiration to keep DB index happy, but we'll re-sort in JS
     orderBy: {
       expirationDate: 'asc',
     }
   });
+
+  // Filter in memory for accent-insensitive search
+  const res = search
+    ? allBatches.filter(batch => {
+      const desc = normalizeText(batch.product.description);
+      const code = normalizeText(batch.productCode);
+      return desc.includes(search) || code.includes(search);
+    })
+    : allBatches;
 
   const sorted = res.sort((a, b) => {
     const isAExpiring = isBefore(new Date(a.expirationDate), expiryThreshold);
