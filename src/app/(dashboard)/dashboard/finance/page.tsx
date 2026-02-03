@@ -100,7 +100,7 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3 2xl:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ventas (Ingresos)</CardTitle>
@@ -161,7 +161,7 @@ export default function FinancePage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <Card className="col-span-1 lg:col-span-1">
           <CardHeader>
             <CardTitle>Análisis Financiero (Montos)</CardTitle>

@@ -18,10 +18,14 @@ export type StockEntryPayload = {
   items: StockEntryItem[];
   shippingCostTotal: number;
   incentiveDiscountTotal: number;
+  entryDate?: string; // Optional override date
 };
 
 export async function createStockEntry(payload: StockEntryPayload) {
-  const { items, shippingCostTotal, incentiveDiscountTotal } = payload;
+  const { items, shippingCostTotal, incentiveDiscountTotal, entryDate } = payload;
+
+  // Use provided date or default to now
+  const actualEntryDate = entryDate ? new Date(entryDate) : new Date();
 
   if (items.length === 0) return { success: false, error: "No hay productos en el ingreso" };
 
@@ -38,7 +42,6 @@ export async function createStockEntry(payload: StockEntryPayload) {
 
   // 2. Prepare Distribution
   // We need to distribute 'totalMaster' among items based on their gross cost weight.
-  let allocatedTotalSoFar = 0;
 
   // Create a temporary array to hold calculated values
   const preparedItems = items.map(item => {
@@ -55,53 +58,8 @@ export async function createStockEntry(payload: StockEntryPayload) {
     };
   });
 
-  // 3. Rounding Logic & Penny Adjustment
-  // We sum up the rounded target costs and check against totalMaster.
-  // We will distribute the difference to the largest item (or last) to ensure exact match.
-  // Actually, let's keep it simple: Adjust the LAST item.
-
-  // Note: We need to store Unit Shipping. 
-  // Formula: UnitShipping = ( (TargetTotal / Qty) / TaxMultiplier ) - UnitGross
-
   try {
     await prisma.$transaction(async (tx) => {
-      for (let i = 0; i < preparedItems.length; i++) {
-        const item = preparedItems[i];
-        let finalTargetTotal = item.targetTotalCost;
-
-        // If it's the last item, we force the sum to match TotalMaster
-        if (i === preparedItems.length - 1) {
-          const currentSum = preparedItems.slice(0, i).reduce((acc, curr) => {
-            // Re-calculate previous items' final totals to be sure
-            // Since we don't have them stored in a variable in this scope easily without re-running logic,
-            // let's do a slightly different approach:
-            // We need to calculate the EXACT derived cost that will be stored.
-            // The database stores: shippingCostUnit. 
-            // The effective Total Cost computed later is:
-            // (Gross + ShippingUnit) * TaxMultiplier * Qty
-            return acc; // Wait, we need to flow the logic better.
-          }, 0);
-
-          // Actually, the simplest reliable way is:
-          // 1. Calculate "Ideal" Unit Shipping.
-          // 2. Round it to DB precision (Decimal usually 2 or 4 places, Prisma handles Decimal).
-          // 3. But we want the RESULT to match.
-        }
-      }
-
-      // RE-THINKING ALGORITHM FOR EXACTNESS WITH DB LIMITS:
-      // We can't easily force "TotalMaster" if we are constrained by storing "UnitShipping" with limited precision.
-      // HOWEVER, if we store high precision decimals, it works. SQLite/Prisma Decimal is high precision.
-
-      // Let's stick to the plan:
-      // 1. Calculate Target Total for the line.
-      // 2. Derive Unit Shipping.
-      // 3. For the last item, adjust Target Total to absorb rounding diffs of the previous lines?
-      // No, because "Target Total" is derived from weights which is float.
-
-      // Better approach:
-      // Accumulate the "Allocated Total" as we go.
-
       // --- Filter Items: Separate ADVENTA items from regular Stock Items ---
       const salesAidItems = preparedItems.filter(i => i.code.startsWith("ADVENTA-"));
       const regularItems = preparedItems.filter(i => !i.code.startsWith("ADVENTA-"));
@@ -118,22 +76,11 @@ export async function createStockEntry(payload: StockEntryPayload) {
         const productMap = new Map(products.map(p => [p.code, p.description]));
 
         for (const item of salesAidItems) {
-          // Calculate total cost for this line (Unit Cost * Qty)
-          // Since it's an expense, we take the Gross Cost as the base.
-          // Should we verify if we strip taxes? Typically expenses are entered as "what I paid".
-          // If the user entered "Cost Gross", that's the base.
-          // BUT, `preparedItems` has `targetTotalCost` which includes taxes/shipping distribution!
-          // Expense tracking should probably reflect the TRUE cost (Total Master allocated).
-
           let amount = item.targetTotalCost;
-
-          // Re-verify logic: 
-          // `targetTotalCost` is the slice of the invoice (Prod + Tax + Shipping - Incentive).
-          // This seems correct for an "Expense" - it's the actual money out.
 
           await tx.expense.create({
             data: {
-              date: new Date(),
+              date: actualEntryDate,
               description: `${productMap.get(item.code) || item.code} (x${item.quantity})`,
               amount: amount,
               code: item.code,
@@ -146,26 +93,7 @@ export async function createStockEntry(payload: StockEntryPayload) {
       // 2. Process Regular Items (Create StockBatches)
       for (let i = 0; i < regularItems.length; i++) {
         const item = regularItems[i];
-
-        // We need to re-calculate "allocatedTotalSoFar" relative to the master total?
-        // Actually, `preparedItems` logic distributed the TOTAL MASTER across ALL items (including ADVENTA).
-        // This is correct: The invoice total includes the sales aid items.
-        // So we keep using `item.targetTotalCost` as calculated.
-
         let assignedTotalLineCost = item.targetTotalCost;
-
-        // Precision Adjustment Logic (Last Item of the ENTIRE list?)
-        // If we split the list, we might lose the "last item" context for ensuring exact total match.
-        // However, `preparedItems` calculated `targetTotalCost` based on weights.
-        // The sum of all `targetTotalCost` equals `totalMaster`.
-        // If we sum (SalesAid_TargetCosts + Regular_TargetCosts), it matches `totalMaster`.
-        // The rounding difference must be absorbed by SOME item.
-        // Let's absorb it in the LAST item of the `regularItems` entry if possible, 
-        // or last `salesAidItems` if that's all there is (though rare).
-
-        // Let's refine:
-        const isAbsoluteLast = (i === regularItems.length - 1) && (salesAidItems.length === 0);
-        // Getting complex. Let's stick to the weight-based target. The penny difference is negligible for now.
 
         // Reverse engineer Unit Shipping for StockBatch
         const unitTotalUntaxed = (assignedTotalLineCost / item.quantity) / taxMultiplier;
@@ -182,6 +110,7 @@ export async function createStockEntry(payload: StockEntryPayload) {
             extraTaxRate: config.extraTaxPercentage,
             offerPrice: 0,
             expirationDate: new Date(item.expirationDate),
+            entryDate: actualEntryDate,
             shippingCostUnit,
             incentiveDiscountUnit: 0,
           }
@@ -197,6 +126,8 @@ export async function createStockEntry(payload: StockEntryPayload) {
     return { success: false, error: "Error al guardar el ingreso de stock." };
   }
 }
+
+
 
 import { addMonths, isBefore } from "date-fns";
 

@@ -32,6 +32,9 @@ export default function NewStockEntryPage() {
     setMounted(true);
   }, []);
 
+  // Header Data
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
+
   // Global costs
   const [shippingCostTotal, setShippingCostTotal] = useState<number>(0);
   const [incentiveDiscountTotal, setIncentiveDiscountTotal] = useState<number>(0);
@@ -88,7 +91,8 @@ export default function NewStockEntryPage() {
     const res = await createStockEntry({
       items,
       shippingCostTotal,
-      incentiveDiscountTotal
+      incentiveDiscountTotal,
+      entryDate
     });
 
     if (res.success) {
@@ -124,9 +128,18 @@ export default function NewStockEntryPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Costos Globales del Pedido</CardTitle>
+            <CardTitle>Datos del Pedido</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Fecha de Compra (Ingreso)</Label>
+              <Input
+                type="date"
+                value={entryDate}
+                onChange={e => setEntryDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Fecha real de la factura o compra.</p>
+            </div>
             <div className="space-y-2">
               <Label>Costo de Envío (Incluye Impuestos)</Label>
               <Input
@@ -240,7 +253,7 @@ export default function NewStockEntryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[200px]">Producto</TableHead>
-                  <TableHead className="w-[100px]">Cant.</TableHead>
+                  <TableHead className="w-[130px]">Cant.</TableHead>
                   <TableHead className="w-[120px]">Costo Bruto por Unidad</TableHead>
                   <TableHead className="w-[150px]">Vencimiento</TableHead>
                   <TableHead className="w-[50px]"></TableHead>

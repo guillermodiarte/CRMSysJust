@@ -329,7 +329,7 @@ export default function NewSalePage() {
                 <TableRow>
                   <TableHead className="w-[180px]">Producto</TableHead>
                   <TableHead className="w-[200px]">Lote</TableHead>
-                  <TableHead className="w-[70px]">Cant.</TableHead>
+                  <TableHead className="w-[130px]">Cant.</TableHead>
                   <TableHead className="w-[100px] text-right">Costo</TableHead>
                   <TableHead className="w-[100px] text-right">Lista</TableHead>
                   <TableHead className="w-[100px] text-right">Oferta</TableHead>
