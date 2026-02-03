@@ -23,14 +23,14 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 
 const sidebarItems = [
-  { name: "Panel Principal", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Productos (Stock)", href: "/dashboard/products", icon: Package },
-  { name: "Ayuda de Venta", href: "/dashboard/sales-help", icon: Briefcase },
-  { name: "Precio de Lista", href: "/dashboard/prices", icon: Tags },
-  { name: "Ventas", href: "/dashboard/sales", icon: ShoppingCart },
-  { name: "Finanzas", href: "/dashboard/finance", icon: Banknote },
-  { name: "Usuarios", href: "/dashboard/users", icon: Users },
-  { name: "Configuración", href: "/dashboard/settings", icon: Settings },
+  { name: "Panel Principal", href: "/dashboard", icon: LayoutDashboard, color: "text-blue-600", bgColor: "bg-blue-50" },
+  { name: "Productos (Stock)", href: "/dashboard/products", icon: Package, color: "text-orange-600", bgColor: "bg-orange-50" },
+  { name: "Ayuda de Venta", href: "/dashboard/sales-help", icon: Briefcase, color: "text-purple-600", bgColor: "bg-purple-50" },
+  { name: "Precio de Lista", href: "/dashboard/prices", icon: Tags, color: "text-pink-600", bgColor: "bg-pink-50" },
+  { name: "Ventas", href: "/dashboard/sales", icon: ShoppingCart, color: "text-green-600", bgColor: "bg-green-50" },
+  { name: "Finanzas", href: "/dashboard/finance", icon: Banknote, color: "text-emerald-600", bgColor: "bg-emerald-50" },
+  { name: "Usuarios", href: "/dashboard/users", icon: Users, color: "text-indigo-600", bgColor: "bg-indigo-50" },
+  { name: "Configuración", href: "/dashboard/settings", icon: Settings, color: "text-slate-600", bgColor: "bg-slate-50" },
 ];
 
 export default function DashboardLayout({
@@ -83,14 +83,16 @@ export default function DashboardLayout({
                 href={item.href}
                 onClick={() => setIsSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-50"
+                    ? "bg-gray-100 text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {item.name}
+                <div className={cn("p-2 rounded-lg transition-colors duration-200", isActive ? "bg-white shadow-sm" : item.bgColor + "/50 group-hover:" + item.bgColor)}>
+                  <Icon className={cn("h-5 w-5", item.color)} />
+                </div>
+                <span className={cn(isActive && "font-bold")}>{item.name}</span>
               </Link>
             );
           })}

@@ -26,6 +26,11 @@ type ProductOption = {
 export default function NewStockEntryPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Global costs
   const [shippingCostTotal, setShippingCostTotal] = useState<number>(0);
@@ -192,36 +197,42 @@ export default function NewStockEntryPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Productos</CardTitle>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={open} className="w-[250px] justify-between">
-                <Plus className="mr-2 h-4 w-4" /> Agregar Producto...
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0">
-              <Command filter={(value, search) => {
-                if (value.includes(normalizeText(search))) return 1;
-                return 0;
-              }}>
-                <CommandInput placeholder="Buscar producto..." />
-                <CommandList>
-                  <CommandEmpty>No encontrado.</CommandEmpty>
-                  <CommandGroup>
-                    {products.map((product) => (
-                      <CommandItem
-                        key={product.code}
-                        value={`${product.description} ${product.code} ${normalizeText(product.description)} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
-                        onSelect={() => addItem(product)}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
-                        {product.code} - {product.description}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          {mounted ? (
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={open} className="w-[250px] justify-between">
+                  <Plus className="mr-2 h-4 w-4" /> Agregar Producto...
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command filter={(value, search) => {
+                  if (value.includes(normalizeText(search))) return 1;
+                  return 0;
+                }}>
+                  <CommandInput placeholder="Buscar producto..." />
+                  <CommandList>
+                    <CommandEmpty>No encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {products.map((product) => (
+                        <CommandItem
+                          key={product.code}
+                          value={`${product.description} ${product.code} ${normalizeText(product.description)} ${product.code.startsWith("ADVENTA") || product.code.startsWith("AYUDA") ? "ayuda de venta adventa" : ""} ${product.code.startsWith("ELIMITADA") ? "edicion limitada elimitada" : ""}`}
+                          onSelect={() => addItem(product)}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4 opacity-0")} />
+                          {product.code} - {product.description}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Button variant="outline" className="w-[250px] justify-between" disabled>
+              <Plus className="mr-2 h-4 w-4 opacity-50" /> Cargando...
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="rounded-md border overflow-x-auto hidden 2xl:block">
