@@ -4,7 +4,7 @@ SysJust es una plataforma integral diseñada para optimizar la gestión de stock
 
 ## 📸 Capturas de Pantalla
 
-![Panel Financiero](public/screenshots/finance-dashboard.png)
+![Panel Financiero](public/screenshots/finance-dashboard-v2.png)
 *Tablero Financiero con KPIs de Ventas, Ganancia Real, Gastos de Stock y Flujo Neto.*
 
 ![Nueva Venta](public/screenshots/new-sale.png)
